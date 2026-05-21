@@ -9,7 +9,8 @@ taking the brick faces as the cells between the lines:
   3. directional morphology -> keep only long horizontal/vertical runs (the
      joint lines); the weathered-surface speckle is discarded
   4. brick faces = NOT grid; connected components -> candidate bricks
-  5. filter by size / aspect / rectangularity
+  5. filter by size / aspect / rectangularity, skipping partial bricks that
+     are cut off by the image border
 
 Writes two images for inspection: `_joints` (the reconstructed grid) and
 `_detected` (the original with detected bricks boxed). Run it, eyeball, tune.
@@ -32,6 +33,7 @@ V_LINE = 55             # min vertical run (px) to count as a joint line
 GRID_DILATE = 7         # thicken / bridge gaps in the reconstructed grid
 FACE_ERODE = 17         # shrink brick faces so neighbours separate cleanly
 MIN_SIDE = 35           # ignore components thinner than this (work px)
+EDGE_MARGIN = 14        # a brick within this of the image border is partial
 AREA_LO, AREA_HI = 0.30, 4.0   # keep components within this x median area
 MAX_ASPECT = 6.0        # longest:shortest side
 MIN_EXTENT = 0.55       # area / bounding-box area (a brick fills its rect)
@@ -78,9 +80,18 @@ def detect(image_path: Path):
                                          (FACE_ERODE, FACE_ERODE)))
 
     n, _, stats, _ = cv2.connectedComponentsWithStats(faces, connectivity=4)
-    candidates = [(x, y, bw, bh, area)
-                  for x, y, bw, bh, area in stats[1:]  # skip background
-                  if bw >= MIN_SIDE and bh >= MIN_SIDE]
+    work_h, work_w = work.shape[:2]
+    candidates = []
+    for x, y, bw, bh, area in stats[1:]:  # skip the background label
+        if bw < MIN_SIDE or bh < MIN_SIDE:
+            continue
+        # Skip partial bricks cut by the image border -- their crops are
+        # incomplete; a whole copy appears in an overlapping photo.
+        if (x <= EDGE_MARGIN or y <= EDGE_MARGIN
+                or x + bw >= work_w - EDGE_MARGIN
+                or y + bh >= work_h - EDGE_MARGIN):
+            continue
+        candidates.append((x, y, bw, bh, area))
     if not candidates:
         return img, work, grid, []
 

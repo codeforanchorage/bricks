@@ -1,0 +1,25 @@
+# Brick OCR test pipeline -- Python dependencies
+#
+# IMPORTANT: install and run this project under Python 3.11, 3.12, or 3.13.
+# paddlepaddle publishes NO wheels for Python 3.14, so PaddleOCR cannot run
+# there. See README.md for environment setup.
+
+# --- Method 2: Claude Haiku (Anthropic API) --------------------------------
+anthropic>=0.40.0
+Pillow>=11.0.0
+
+# --- Method 3: Gemini 2.5 Pro (Google Gemini API) --------------------------
+google-genai>=1.0.0
+
+# --- Method 1: PaddleOCR (local OCR) ---------------------------------------
+paddleocr>=3.0.0
+#
+# paddleocr does NOT pull in the paddlepaddle runtime -- install it separately,
+# matching your hardware. Pick ONE of:
+#
+#   GPU build (CUDA): see https://www.paddlepaddle.org.cn/en/install/quick
+#       for the exact command/index URL for your CUDA version, e.g.
+#       pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
+#
+#   CPU build (always works, fine for small test batches):
+#       pip install paddlepaddle

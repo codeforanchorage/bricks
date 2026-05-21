@@ -1,0 +1,16 @@
+# Secrets -- never commit
+.env
+
+# Python environment & caches
+.venv/
+__pycache__/
+*.pyc
+
+# Brick photos / video -- not committed (add your own to test_images/)
+test_images/
+
+# Generated output: CSVs, crops, annotated images
+output/
+
+# Scratch: extracted video frames
+frames/

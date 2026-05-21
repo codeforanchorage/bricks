@@ -96,7 +96,8 @@ def run_method(method_fn, *args) -> tuple[list[dict], str | None]:
     try:
         return method_fn(*args), None
     except Exception as exc:  # noqa: BLE001 -- surface any failure per method
-        return [], f"{type(exc).__name__}: {exc}"
+        msg = f"{type(exc).__name__}: {exc}".replace("\n", " ")
+        return [], (msg[:200] + " ...") if len(msg) > 200 else msg
 
 
 def rows_for(filename: str, method: str, items: list[dict],

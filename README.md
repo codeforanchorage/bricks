@@ -195,20 +195,23 @@ over-merging. Use `--no-group` to see the raw detections while tuning.
 
 ```
 brick-ocr/
-  pipeline.py        whole-image comparison pipeline + CSV writer
-  brick_pipeline.py  per-brick pipeline: detect -> crop -> OCR each brick
-  detect_bricks.py   classical-CV paver detector (mortar-joint grid)
-  consensus.py       collapses the comparison CSV into a triaged catalogue
-  ocr_paddle.py      PaddleOCR wrapper (Method 1)
-  ocr_anthropic.py   Anthropic provider — Claude Sonnet (Method 2)
-  ocr_google.py      Google provider — Gemini 2.5 Pro & Flash (Methods 3-4)
-  vision_ocr.py      shared prompt + image/JSON handling for the LLM methods
-  tiling.py          splits an image into overlapping tiles
-  group_bricks.py    groups PaddleOCR line detections into bricks
-  compare.py         stacked terminal comparison output
-  requirements.txt   dependencies
-  test_images/       input JPEGs go here
-  output/            results, crops, and annotated images land here
+  pipeline.py          whole-image comparison pipeline + CSV writer
+  brick_pipeline.py    per-brick pipeline: detect -> crop -> OCR each brick
+  detect_bricks.py     classical-CV paver detector (mortar-joint grid)
+  parse_brick_list.py  parse the Municipality brick-list PDF into a CSV
+  match.py             match the OCR catalogue against the official list
+  consensus.py         collapses a comparison CSV into a triaged catalogue
+  ocr_paddle.py        PaddleOCR wrapper
+  ocr_anthropic.py     Anthropic provider (Claude)
+  ocr_google.py        Google provider (Gemini)
+  vision_ocr.py        shared prompt + image/JSON handling for the LLM methods
+  tiling.py            splits an image into overlapping tiles
+  group_bricks.py      groups PaddleOCR line detections into bricks
+  compare.py           stacked terminal comparison output
+  requirements.txt     dependencies
+  reference/           official Municipality brick list (brick_list.csv)
+  test_images/         input JPEGs go here
+  output/              results, crops, and annotated images land here
 ```
 
 ## Not yet implemented (planned)

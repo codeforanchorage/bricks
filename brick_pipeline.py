@@ -92,8 +92,8 @@ def main(argv=None) -> None:
                         help="Directory of brick images (.jpg/.jpeg/.png)")
     parser.add_argument("--output", required=True, type=Path,
                         help="Catalogue CSV to write")
-    parser.add_argument("--methods", default="sonnet,gemini-pro,gemini-flash",
-                        help="Comma-separated methods (default: the 3 LLMs)")
+    parser.add_argument("--methods", default="gemini-flash",
+                        help="Comma-separated methods (default: gemini-flash)")
     args = parser.parse_args(argv)
 
     requested = [m.strip().lower() for m in args.methods.split(",") if m.strip()]

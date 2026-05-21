@@ -12,5 +12,9 @@ test_images/
 # Generated output: CSVs, crops, annotated images
 output/
 
-# Scratch: extracted video frames
+# Scratch
 frames/
+_one/
+
+# Raw reference PDF (re-downloadable; the parsed brick_list.csv is committed)
+reference/*.pdf

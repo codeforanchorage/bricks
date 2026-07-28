@@ -26,13 +26,23 @@ import csv
 import sys
 from pathlib import Path
 
-from consensus import _match_key, _normalise, _similar, scan_fold
+from consensus import _match_key, _normalise, _similar, scan_fold, token_containment
 
 # Catalogue columns that are not OCR-method reads.
 _NON_READ = {"image", "brick_id", "x", "y", "w", "h", "status"}
 DEFAULT_MIN_SCORE = 0.80   # genuine matches score >=0.84; false positives <=0.71
 
-MATCH_COLUMNS = ["image", "brick_id", "match_status", "score",
+# A containment-based match (read words found inside a longer inscription) is
+# accepted only when the best candidate beats the best *different* inscription
+# by this margin -- a generic word set that fits many bricks ties and is
+# rejected, while a distinctive subset ("BEATY" + "BUDDY") stands alone.
+# Because of that extra gate, the tokens path is allowed a slightly lower
+# score bar than whole-string matching (a hallucinated extra word drags the
+# average even when the real words match exactly).
+CONTAIN_MARGIN = 0.05
+CONTAIN_DISCOUNT = 0.05
+
+MATCH_COLUMNS = ["image", "brick_id", "match_status", "match_basis", "score",
                  "official_id", "official_section", "official_name",
                  "official_keyword", "matched_read"]
 
@@ -68,18 +78,42 @@ def _load_reference(path: Path, section: str, scan_ocr: bool = False) -> list[di
     return refs
 
 
-def _best_match(reads: list[str], reference: list[dict], scan_ocr: bool = False):
-    """Best (score, ref_row, winning_read) of any read vs any official name."""
-    best_score, best_ref, best_read = 0.0, None, ""
+def _best_match(reads: list[str], reference: list[dict], scan_ocr: bool = False,
+                min_score: float = DEFAULT_MIN_SCORE):
+    """Best official brick for any of a detection's reads.
+
+    Each (read, reference) pair is scored two ways: whole-string similarity,
+    and token containment (see consensus.token_containment) for reads that are
+    a noisy subset of a longer inscription. The containment path only counts
+    when whole-string similarity fell short, and its acceptance needs a
+    CONTAIN_MARGIN lead over the best differently-inscribed candidate --
+    tracked here as `runner_up` (duplicate inscriptions excluded, so a brick
+    sold in identical copies does not veto itself).
+
+    Returns (score, basis, margin, ref_row, winning_read); basis is "text" or
+    "tokens".
+    """
+    best_score, best_basis, best_ref, best_read = 0.0, "text", None, ""
+    runner_up = 0.0
     for read in reads:
         key = _key_for(read, scan_ocr)
         if not key:
             continue
         for ref in reference:
             score = _similar(key, ref["_key"])
+            basis = "text"
+            if score < min_score:
+                contained = token_containment(key, ref["_key"])
+                if contained > score:
+                    score, basis = contained, "tokens"
             if score > best_score:
-                best_score, best_ref, best_read = score, ref, read
-    return best_score, best_ref, best_read
+                if best_ref is not None and ref["_key"] != best_ref["_key"]:
+                    runner_up = best_score
+                best_score, best_basis, best_ref, best_read = score, basis, ref, read
+            elif score > runner_up and (best_ref is None
+                                        or ref["_key"] != best_ref["_key"]):
+                runner_up = score
+    return best_score, best_basis, best_score - runner_up, best_ref, best_read
 
 
 def main(argv=None) -> None:
@@ -127,14 +161,20 @@ def main(argv=None) -> None:
     for brick in catalog:
         reads = [brick[c] for c in read_cols
                  if brick.get(c) and not brick[c].startswith("ERROR:")]
-        score, ref, read = _best_match(reads, reference, args.scan_ocr)
-        matched = ref is not None and score >= args.min_score
+        score, basis, margin, ref, read = _best_match(reads, reference,
+                                                      args.scan_ocr,
+                                                      args.min_score)
+        min_needed = (args.min_score if basis == "text"
+                      else args.min_score - CONTAIN_DISCOUNT)
+        matched = (ref is not None and score >= min_needed
+                   and (basis == "text" or margin >= CONTAIN_MARGIN))
         if matched:
             matched_ids.add(ref["assigned_id"])
         rows.append({
             "image": brick.get("image", ""),
             "brick_id": brick.get("brick_id", ""),
             "match_status": "matched" if matched else "unmatched",
+            "match_basis": basis,
             "score": f"{score:.2f}",
             "official_id": ref["assigned_id"] if ref else "",
             "official_section": ref["section"] if ref else "",

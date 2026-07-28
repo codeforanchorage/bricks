@@ -267,6 +267,16 @@ python merge_lists.py --og reference/tsp_brick_list.csv \
     --new reference/brick_list.csv --output reference/master_list.csv
 ```
 
+`match.py` scores each candidate two ways and reports which won in the
+`match_basis` column: `text` (whole-string similarity, threshold `--min-score`)
+and `tokens` (containment — each read word scored against its best counterpart
+in the inscription, for worn bricks whose read is a noisy *subset* like
+"GRAND BEATY BUDDY" for "HAROLD G BEATY 1938-1991 MY 'BUDDY'"). Because a
+generic word set fits many bricks, a `tokens` match must also beat the best
+*differently-inscribed* candidate by a clear margin; in exchange it gets a
+slightly lower score bar. Hallucinated reads tie across several bricks and are
+rejected by the margin; distinctive subsets stand alone and pass.
+
 `match.py` accepts the master list directly, so a warehouse photo resolves to
 section + current number + buyer in one step:
 

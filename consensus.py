@@ -88,6 +88,28 @@ def _similar(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
+def token_containment(read_key: str, ref_key: str) -> float:
+    """How well the read's words are found *somewhere* in the reference key.
+
+    A worn brick often yields a read that is a noisy subset of the inscription
+    ("GRAND BEATY BUDDY" for "HAROLD G BEATY 1938-1991 MY 'BUDDY'"). Whole-
+    string similarity punishes the read for every word it missed; this instead
+    scores each read word by its best match among the reference words, weighted
+    by length (longer words are more discriminative).
+
+    Words shorter than 3 characters are ignored on the read side -- a stray
+    "g" or "91" would match almost anything -- and a read with fewer than two
+    usable words returns 0.0: one word, however good, is not identification.
+    """
+    read_words = [w for w in read_key.split() if len(w) >= 3]
+    ref_words = ref_key.split()
+    if len(read_words) < 2 or not ref_words:
+        return 0.0
+    weighted = sum(len(w) * max(_similar(w, r) for r in ref_words)
+                   for w in read_words)
+    return weighted / sum(len(w) for w in read_words)
+
+
 def _priority(method: str) -> int:
     return METHOD_PRIORITY.index(method) if method in METHOD_PRIORITY else 99
 

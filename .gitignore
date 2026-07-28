@@ -16,5 +16,7 @@ output/
 frames/
 _one/
 
-# Raw reference PDF (re-downloadable; the parsed brick_list.csv is committed)
+# Raw reference PDFs (re-downloadable from muni.org/Departments/parks --
+# TownSquareBricks.aspx; the parsed CSVs are committed)
 reference/*.pdf
+*.pdf

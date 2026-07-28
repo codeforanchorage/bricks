@@ -26,7 +26,7 @@ import csv
 import sys
 from pathlib import Path
 
-from consensus import _match_key, _normalise, _similar
+from consensus import _match_key, _normalise, _similar, scan_fold
 
 # Catalogue columns that are not OCR-method reads.
 _NON_READ = {"image", "brick_id", "x", "y", "w", "h", "status"}
@@ -37,26 +37,42 @@ MATCH_COLUMNS = ["image", "brick_id", "match_status", "score",
                  "official_keyword", "matched_read"]
 
 
-def _load_reference(path: Path, section: str) -> list[dict]:
-    """Load the official brick list, optionally one section, with normalised text."""
+def _key_for(text: str, scan_ocr: bool) -> str:
+    """Comparison key for one inscription."""
+    key = _match_key(_normalise(text))
+    return scan_fold(key) if scan_ocr else key
+
+
+def _load_reference(path: Path, section: str, scan_ocr: bool = False) -> list[dict]:
+    """Load the official brick list, optionally one section, with normalised text.
+
+    Accepts either parsed-PDF list (parse_brick_list.py / parse_tsp_list.py)
+    or the merged master list (merge_lists.py), which is adapted to the same
+    shape -- preferring the cleaner new-list inscription when the row has one.
+    """
     refs = []
     with open(path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
+            if "og_inscription" in row:   # master_list.csv
+                row = {"section": row["section"],
+                       "assigned_id": row["new_id"] or row["orig_id"],
+                       "full_name": row["new_inscription"] or row["og_inscription"],
+                       "key_word": row["buyer"]}
             if section and row["section"].upper() != section.upper():
                 continue
             # Match on the distinctive words only -- boilerplate like
             # "IN MEMORY OF" otherwise inflates similarity between bricks.
-            row["_key"] = _match_key(_normalise(row["full_name"]))
+            row["_key"] = _key_for(row["full_name"], scan_ocr)
             if row["_key"]:
                 refs.append(row)
     return refs
 
 
-def _best_match(reads: list[str], reference: list[dict]):
+def _best_match(reads: list[str], reference: list[dict], scan_ocr: bool = False):
     """Best (score, ref_row, winning_read) of any read vs any official name."""
     best_score, best_ref, best_read = 0.0, None, ""
     for read in reads:
-        key = _match_key(_normalise(read))
+        key = _key_for(read, scan_ocr)
         if not key:
             continue
         for ref in reference:
@@ -83,13 +99,17 @@ def main(argv=None) -> None:
     parser.add_argument("--min-score", type=float, default=DEFAULT_MIN_SCORE,
                         help=f"Similarity needed to accept a match "
                              f"(default: {DEFAULT_MIN_SCORE})")
+    parser.add_argument("--scan-ocr", action="store_true",
+                        help="Fold OCR-confusable letters (I/L/T, E/F, O/D) on "
+                             "both sides. Use with the scanned by-name list "
+                             "(tsp_brick_list.csv), whose own OCR is noisy.")
     args = parser.parse_args(argv)
 
     for path in (args.catalog, args.reference):
         if not path.is_file():
             raise SystemExit(f"File not found: {path}")
 
-    reference = _load_reference(args.reference, args.section)
+    reference = _load_reference(args.reference, args.section, args.scan_ocr)
     if not reference:
         raise SystemExit(f"No reference bricks loaded (section {args.section!r}?)")
 
@@ -107,7 +127,7 @@ def main(argv=None) -> None:
     for brick in catalog:
         reads = [brick[c] for c in read_cols
                  if brick.get(c) and not brick[c].startswith("ERROR:")]
-        score, ref, read = _best_match(reads, reference)
+        score, ref, read = _best_match(reads, reference, args.scan_ocr)
         matched = ref is not None and score >= args.min_score
         if matched:
             matched_ids.add(ref["assigned_id"])

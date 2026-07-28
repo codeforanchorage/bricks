@@ -197,9 +197,12 @@ over-merging. Use `--no-group` to see the raw detections while tuning.
 brick-ocr/
   pipeline.py          whole-image comparison pipeline + CSV writer
   brick_pipeline.py    per-brick pipeline: detect -> crop -> OCR each brick
+  single_pipeline.py   one-photo-per-brick pipeline (no detection step)
   detect_bricks.py     classical-CV paver detector (mortar-joint grid)
-  parse_brick_list.py  parse the Municipality brick-list PDF into a CSV
-  match.py             match the OCR catalogue against the official list
+  parse_brick_list.py  parse the Municipality by-area brick-list PDF into a CSV
+  parse_tsp_list.py    parse the original by-name (all bricks) PDF into a CSV
+  merge_lists.py       merge both lists into the master lookup table
+  match.py             match the OCR catalogue against an official list
   consensus.py         collapses a comparison CSV into a triaged catalogue
   ocr_paddle.py        PaddleOCR wrapper
   ocr_anthropic.py     Anthropic provider (Claude)
@@ -209,10 +212,87 @@ brick-ocr/
   group_bricks.py      groups PaddleOCR line detections into bricks
   compare.py           stacked terminal comparison output
   requirements.txt     dependencies
-  reference/           official Municipality brick list (brick_list.csv)
+  reference/           official Municipality brick lists (see below)
   test_images/         input JPEGs go here
   output/              results, crops, and annotated images land here
 ```
+
+## The two official lists
+
+There are two Municipality lists, and they complement each other. Neither
+alone is enough.
+
+| | `brick_list.csv` (by area) | `tsp_brick_list.csv` (by name) |
+|---|---|---|
+| source | `ABCDHIJK.pdf`, digital text | `TSP Bricks ALL - OG List by Name - OCR.pdf`, a scan |
+| rows | 7,874 | 13,336 |
+| coverage | **areas A–D and H–K only** | **all bricks, including E, F, G** |
+| gives you | the section (which pallets to search) | the brick # and the **buyer's name** |
+| text quality | clean | noisy OCR (`TOWN`→`IOWN`, `THE`→`'IHE`) |
+
+Why two lists exist (per the 2009 *How to Find Your Brick* brochure and
+muni.org): the 2008 renovation relocated ~8,000 bricks and **renumbered** them
+— those are areas A–D/H–K and the by-area list ("new brick numbers"). Areas
+E, F and G were *not* moved in 2008, so they kept their **original**
+(certificate) numbers and never appeared in the by-area list. The by-name
+list's Brick# is the original number for every brick. The original numbers of
+the unmoved areas are contiguous ranges, so for them the number alone gives
+the section:
+
+| original # | area | 2008 fate |
+|---|---|---|
+| 1–3,377 | F | unmoved — original # still valid |
+| 8,279–9,126 | G | unmoved — original # still valid |
+| 9,127–10,070 | E | unmoved — original # still valid |
+| everything else | A–D, H–K | relocated + renumbered — look up by text |
+
+For a *moved* brick the two numbers are unrelated ("Travis E Williams" is
+`#3770` originally, `#7305` in area I now) — join on inscription text, never
+on the id.
+
+### The master list
+
+`merge_lists.py` combines both lists into `reference/master_list.csv` — one
+row per original brick with `orig_id`, `new_id`, `section`, `moved`, `status`,
+`buyer`, and both inscriptions. Unmoved bricks get their section from the
+number ranges; moved bricks are text-joined to the by-area list (word-blocked
+fuzzy match at ≥0.80, plus a stricter rescue pass — lower score but a clear
+margin over the runner-up *and* buyer-surname corroboration). Current yield:
+12,404 of 13,336 rows fully resolved, 913 flagged `unjoined` for review, 19
+sales recorded as "NO BRICK NO INSCRIPTION". By-area rows no OG row claimed
+land in `master_unclaimed.csv`.
+
+```bash
+python merge_lists.py --og reference/tsp_brick_list.csv \
+    --new reference/brick_list.csv --output reference/master_list.csv
+```
+
+`match.py` accepts the master list directly, so a warehouse photo resolves to
+section + current number + buyer in one step:
+
+```bash
+python match.py --catalog output/singles.csv \
+    --reference reference/master_list.csv \
+    --output output/matched.csv --scan-ocr
+```
+
+This is the backbone of the pickup workflow: a visitor (or staff) searches the
+master list by surname or inscription → *does the brick exist?* (`status`) →
+*which section / pallet group?* (`section`); photo-matching against pallets
+then confirms *present / broken* per brick.
+
+Because the by-name list is a scan, match against it with `--scan-ocr`, which
+folds the confusable letter groups (I/L/T/1/J, E/F, O/D/Q/0) on both sides:
+
+```bash
+python parse_tsp_list.py --pdf "TSP Bricks ALL - OG List by Name - OCR.pdf" \
+    --output reference/tsp_brick_list.csv
+python match.py --catalog output/singles.csv \
+    --reference reference/tsp_brick_list.csv \
+    --output output/singles_tsp_matched.csv --scan-ocr
+```
+
+`--section` does not apply to the by-name list (it has no section column).
 
 ## Not yet implemented (planned)
 

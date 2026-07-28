@@ -66,6 +66,24 @@ def _match_key(norm: str) -> str:
     return key or norm
 
 
+# The original by-name brick list is a scan whose own OCR confuses a small,
+# very consistent set of letter shapes -- TOWN->IOWN, LOVES->IDVES, THE->'IHE,
+# ALASKA->AIASKA, LOVES->IDVFS. Folding each confusable group to one character
+# on *both* sides of a comparison lets a good photo read match a badly scanned
+# list entry, without trying to guess a correction for the scan text itself.
+_CONFUSABLE = str.maketrans({
+    "l": "i", "t": "i", "1": "i", "j": "i",   # I / L / T / 1 / J
+    "f": "e",                                 # E / F
+    "d": "o", "q": "o", "0": "o",             # O / D / Q / 0
+    "5": "s", "8": "b",                       # S / 5, B / 8
+})
+
+
+def scan_fold(text: str) -> str:
+    """Collapse scan-OCR confusable letters so noisy text still compares."""
+    return text.translate(_CONFUSABLE)
+
+
 def _similar(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 

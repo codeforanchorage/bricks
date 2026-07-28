@@ -11,8 +11,9 @@ Pillow>=11.0.0
 # --- Method 3: Gemini 2.5 Pro (Google Gemini API) --------------------------
 google-genai>=1.0.0
 
-# --- Reference data: parse the Municipality brick-list PDF -----------------
+# --- Reference data: parse the Municipality brick lists (PDF / .xls) -------
 pypdfium2>=4.0.0
+xlrd>=2.0.0
 
 # --- Method 1: PaddleOCR (local OCR) ---------------------------------------
 paddleocr>=3.0.0

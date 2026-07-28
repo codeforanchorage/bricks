@@ -27,7 +27,8 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from consensus import _match_key, _normalise, _similar, scan_fold, token_containment
+from consensus import (_match_key, _normalise, phonetic_fold, scan_fold,
+                       similar_spoken, token_containment)
 
 # Catalogue columns that are not OCR-method reads.
 _NON_READ = {"image", "brick_id", "x", "y", "w", "h", "status"}
@@ -84,7 +85,10 @@ def _block_index(reference: list[dict]) -> dict[str, list[int]]:
     sharing at least one distinctive word instead of the whole list."""
     index = defaultdict(list)
     for i, ref in enumerate(reference):
-        for word in set(ref["_key"].split()):
+        words = set(ref["_key"].split())
+        # Index phonetic folds too, or CATHY never blocks against KATHY.
+        words.update(phonetic_fold(w) for w in tuple(words))
+        for word in words:
             if len(word) >= 3:
                 index[word].append(i)
     return index
@@ -95,7 +99,9 @@ def _candidates(reads: list[str], reference: list[dict], index: dict,
     """Reference rows sharing >=1 folded word with any read."""
     hits = set()
     for read in reads:
-        for word in set(_key_for(read, scan_ocr).split()):
+        words = set(_key_for(read, scan_ocr).split())
+        words.update(phonetic_fold(w) for w in tuple(words))
+        for word in words:
             if len(word) >= 3:
                 hits.update(index.get(word, ()))
     return [reference[i] for i in hits]
@@ -123,7 +129,10 @@ def _best_match(reads: list[str], reference: list[dict], scan_ocr: bool = False,
         if not key:
             continue
         for ref in reference:
-            score = _similar(key, ref["_key"])
+            # similar_spoken: parts of the official lists were voice-
+            # transcribed, so phonetic spelling variants (BRIAN/BRYAN,
+            # CATHY/KATHY) must compare as equal.
+            score = similar_spoken(key, ref["_key"])
             basis = "text"
             if score < min_score:
                 contained = token_containment(key, ref["_key"])

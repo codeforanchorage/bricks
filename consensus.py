@@ -88,6 +88,27 @@ def _similar(a: str, b: str) -> float:
     return SequenceMatcher(None, a, b).ratio()
 
 
+# Parts of the official lists were transcribed by voice, so a reference entry
+# can spell a name phonetically while the brick spells it properly (BRIAN vs
+# BRYAN, CATHY vs KATHY, BRITANY vs BRITTANY). Folding the classic phonetic
+# equivalences -- and collapsing doubled letters -- lets those pairs compare
+# as equal without loosening comparisons between genuinely different names.
+_PH_PAIRS = [("ph", "f"), ("ck", "k")]
+
+
+def phonetic_fold(text: str) -> str:
+    """Collapse voice-transcription spelling variants for comparison."""
+    for a, b in _PH_PAIRS:
+        text = text.replace(a, b)
+    text = (text.replace("c", "k").replace("z", "s").replace("y", "i"))
+    return re.sub(r"(.)\1+", r"\1", text)
+
+
+def similar_spoken(a: str, b: str) -> float:
+    """Similarity that forgives phonetic spelling differences."""
+    return max(_similar(a, b), _similar(phonetic_fold(a), phonetic_fold(b)))
+
+
 def token_containment(read_key: str, ref_key: str) -> float:
     """How well the read's words are found *somewhere* in the reference key.
 
@@ -105,7 +126,7 @@ def token_containment(read_key: str, ref_key: str) -> float:
     ref_words = ref_key.split()
     if len(read_words) < 2 or not ref_words:
         return 0.0
-    weighted = sum(len(w) * max(_similar(w, r) for r in ref_words)
+    weighted = sum(len(w) * max(similar_spoken(w, r) for r in ref_words)
                    for w in read_words)
     return weighted / sum(len(w) for w in read_words)
 

@@ -199,8 +199,10 @@ brick-ocr/
   brick_pipeline.py    per-brick pipeline: detect -> crop -> OCR each brick
   single_pipeline.py   one-photo-per-brick pipeline (no detection step)
   detect_bricks.py     classical-CV paver detector (mortar-joint grid)
-  parse_brick_list.py  parse the Municipality by-area brick-list PDF into a CSV
+  parse_xls_list.py    parse the source Excel workbook of new brick numbers
+  parse_brick_list.py  parse the by-area brick-list PDF (superseded by the .xls)
   parse_tsp_list.py    parse the original by-name (all bricks) PDF into a CSV
+  reocr_tsp_pdf.py     re-transcribe the scanned by-name PDF with a vision LLM
   merge_lists.py       merge both lists into the master lookup table
   match.py             match the OCR catalogue against an official list
   consensus.py         collapses a comparison CSV into a triaged catalogue
@@ -222,13 +224,25 @@ brick-ocr/
 There are two Municipality lists, and they complement each other. Neither
 alone is enough.
 
-| | `brick_list.csv` (by area) | `tsp_brick_list.csv` (by name) |
+| | `brick_list_xls.csv` (by area) | `tsp_brick_list.csv` (by name) |
 |---|---|---|
-| source | `ABCDHIJK.pdf`, digital text | `TSP Bricks ALL - OG List by Name - OCR.pdf`, a scan |
-| rows | 7,874 | 13,336 |
+| source | `TSP Bricks All.xls`, the 2008 source workbook | `TSP Bricks ALL - OG List by Name - OCR.pdf`, a scan |
+| rows | 8,281 | 13,336 |
 | coverage | **areas A–D and H–K only** | **all bricks, including E, F, G** |
-| gives you | the section (which pallets to search) | the brick # and the **buyer's name** |
-| text quality | clean | noisy OCR (`TOWN`→`IOWN`, `THE`→`'IHE`) |
+| gives you | the section + grid position (Column/Row) | the brick # and the **buyer's name** |
+| text quality | clean (digital source) | noisy OCR (`TOWN`→`IOWN`, `THE`→`'IHE`) |
+
+`brick_list_xls.csv` (from `parse_xls_list.py`) supersedes `brick_list.csv`,
+the older parse of the printed PDF (`ABCDHIJK.pdf`, a.k.a. "ABCDHIJK New
+Brick Numbers.pdf"): the workbook is what that PDF was printed from, and the
+PDF text-extraction had lost 407 rows (mostly area C), truncated 68
+inscriptions, and mis-sectioned 111 boundary bricks.
+
+A separate data caveat that applies to *both* lists: some entries were
+transcribed **by voice**, so the list can spell a name phonetically while the
+brick spells it properly (BRIAN vs BRYAN, CATHY vs KATHY). Matching folds the
+classic phonetic equivalences (`consensus.phonetic_fold`) so those pairs
+compare as equal.
 
 Why two lists exist (per the 2009 *How to Find Your Brick* brochure and
 muni.org): the 2008 renovation relocated ~8,000 bricks and **renumbered** them
@@ -257,14 +271,15 @@ row per original brick with `orig_id`, `new_id`, `section`, `moved`, `status`,
 `buyer`, and both inscriptions. Unmoved bricks get their section from the
 number ranges; moved bricks are text-joined to the by-area list (word-blocked
 fuzzy match at ≥0.80, plus a stricter rescue pass — lower score but a clear
-margin over the runner-up *and* buyer-surname corroboration). Current yield:
-12,404 of 13,336 rows fully resolved, 913 flagged `unjoined` for review, 19
+margin over the runner-up *and* buyer-surname corroboration; identical-copy
+batches are then assigned one-to-one). Current yield with the .xls source:
+12,642 of 13,336 rows fully resolved, 675 flagged `unjoined` for review, 19
 sales recorded as "NO BRICK NO INSCRIPTION". By-area rows no OG row claimed
 land in `master_unclaimed.csv`.
 
 ```bash
 python merge_lists.py --og reference/tsp_brick_list.csv \
-    --new reference/brick_list.csv --output reference/master_list.csv
+    --new reference/brick_list_xls.csv --output reference/master_list.csv
 ```
 
 `match.py` scores each candidate two ways and reports which won in the

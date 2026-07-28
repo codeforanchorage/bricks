@@ -148,12 +148,28 @@ def main(argv=None) -> None:
              else [int(p) for p in args.pages.split(",")])
     client = genai.Client()
 
-    all_rows, in_tokens, out_tokens = [], 0, 0
+    all_rows, in_tokens, out_tokens, failed = [], 0, 0, []
     for index in pages:
-        rows, usage = _transcribe(client, types, _render_page(pdf, index))
-        in_tokens += getattr(usage, "prompt_token_count", 0) or 0
-        out_tokens += getattr(usage, "candidates_token_count", 0) or 0
-        print(f"  page {index}: {len(rows)} rows")
+        # A 174-page run must survive transient API hiccups: retry each page,
+        # then record and move on -- failed pages are listed at the end for a
+        # targeted rerun rather than killing an hour of progress.
+        for attempt in range(3):
+            try:
+                rows, usage = _transcribe(client, types,
+                                          _render_page(pdf, index))
+                break
+            except Exception as exc:  # noqa: BLE001
+                if attempt == 2:
+                    print(f"  page {index}: FAILED ({exc})", flush=True)
+                    rows, usage = [], None
+                    failed.append(index)
+                else:
+                    import time
+                    time.sleep(10 * (attempt + 1))
+        if usage is not None:
+            in_tokens += getattr(usage, "prompt_token_count", 0) or 0
+            out_tokens += getattr(usage, "candidates_token_count", 0) or 0
+            print(f"  page {index}: {len(rows)} rows", flush=True)
         all_rows.extend(rows)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
@@ -171,6 +187,9 @@ def main(argv=None) -> None:
 
     cost = in_tokens / 1e6 * 0.30 + out_tokens / 1e6 * 2.50
     print(f"\nWrote {args.output}  ({len(all_rows)} rows, {len(pages)} pages)")
+    if failed:
+        print(f"FAILED pages (rerun with --pages "
+              f"{','.join(map(str, failed))}): {failed}")
     print(f"Tokens: {in_tokens} in / {out_tokens} out  ~= ${cost:.4f} "
           f"({MODEL}); all 174 pages ~= ${cost / len(pages) * 174:.2f}")
 

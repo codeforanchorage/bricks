@@ -126,6 +126,50 @@ def _surname_corroborates(buyer: str, candidate: dict) -> bool:
     return any(_similar(surname[0], w) >= RESCUE_SURNAME_SIM for w in words)
 
 
+def _spread_identical_copies(out_rows: list[dict], new_rows: list[dict],
+                             claimed: set, counts: dict) -> None:
+    """Reassign identical-inscription bricks one-to-one.
+
+    Organisations bought batches of identical bricks (9x ACPA, 17x
+    "98.9 MAGIC FM", ...). Independent best-matching sends every OG copy to
+    the SAME new-list row; here each group of identical claims is spread
+    across that inscription's identical new-list rows instead. Which copy
+    pairs with which is arbitrary (the bricks are indistinguishable), so both
+    sides are taken in id order for determinism. OG copies beyond the new
+    list's copy count revert to 'unjoined' -- they have no distinct
+    counterpart and should surface in review rather than silently share one.
+    """
+    by_new_id = defaultdict(list)
+    for row in out_rows:
+        if row["moved"] == "yes" and row["new_id"]:
+            by_new_id[row["new_id"]].append(row)
+
+    copies_by_key = defaultdict(list)
+    for ref in new_rows:
+        copies_by_key[ref["_key"]].append(ref)
+
+    for new_id, claimants in by_new_id.items():
+        if len(claimants) < 2:
+            continue
+        target = next(r for r in new_rows if r["assigned_id"] == new_id)
+        copies = sorted(copies_by_key[target["_key"]],
+                        key=lambda r: int(r["assigned_id"].replace(",", "") or 0))
+        claimants.sort(key=lambda r: int(r["orig_id"]) if r["orig_id"].isdigit()
+                       else 0)
+        for i, row in enumerate(claimants):
+            if i < len(copies):
+                ref = copies[i]
+                row.update(new_id=ref["assigned_id"], section=ref["section"],
+                           new_inscription=ref["full_name"])
+                claimed.add(id(ref))
+            else:
+                row.update(new_id="", section="", new_inscription="",
+                           join_score="", status="unjoined")
+                counts["joined"] -= 1
+                counts["unjoined"] += 1
+                counts["copy_overflow"] += 1
+
+
 def main(argv=None) -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -191,6 +235,8 @@ def main(argv=None) -> None:
                 counts["unjoined"] += 1
         out_rows.append(row)
 
+    _spread_identical_copies(out_rows, new_rows, claimed, counts)
+
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with open(args.output, "w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=COLUMNS)
@@ -209,7 +255,9 @@ def main(argv=None) -> None:
     print(f"\n  unmoved (E/F/G, section from number) : {counts['unmoved']}")
     print(f"  moved, joined by text                : {counts['joined']}")
     print(f"  moved, rescued (margin + surname)    : {counts['rescued']}")
-    print(f"  moved, no text match (review)        : {counts['unjoined']}")
+    print(f"  moved, no text match (review)        : {counts['unjoined']}"
+          + (f" (incl. {counts['copy_overflow']} identical-copy overflow)"
+             if counts["copy_overflow"] else ""))
     print(f"  'NO BRICK' sales                     : {counts['no_brick']}")
     print(f"\nWrote {args.output}")
     print(f"New-list rows no OG row claimed: {len(unclaimed)} -> {unclaimed_path}")

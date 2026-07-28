@@ -24,6 +24,7 @@ from __future__ import annotations
 import argparse
 import csv
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 from consensus import _match_key, _normalise, _similar, scan_fold, token_containment
@@ -76,6 +77,28 @@ def _load_reference(path: Path, section: str, scan_ocr: bool = False) -> list[di
             if row["_key"]:
                 refs.append(row)
     return refs
+
+
+def _block_index(reference: list[dict]) -> dict[str, list[int]]:
+    """Folded word -> reference indices, so most reads score only candidates
+    sharing at least one distinctive word instead of the whole list."""
+    index = defaultdict(list)
+    for i, ref in enumerate(reference):
+        for word in set(ref["_key"].split()):
+            if len(word) >= 3:
+                index[word].append(i)
+    return index
+
+
+def _candidates(reads: list[str], reference: list[dict], index: dict,
+                scan_ocr: bool) -> list[dict]:
+    """Reference rows sharing >=1 folded word with any read."""
+    hits = set()
+    for read in reads:
+        for word in set(_key_for(read, scan_ocr).split()):
+            if len(word) >= 3:
+                hits.update(index.get(word, ()))
+    return [reference[i] for i in hits]
 
 
 def _best_match(reads: list[str], reference: list[dict], scan_ocr: bool = False,
@@ -156,14 +179,24 @@ def main(argv=None) -> None:
     print(f"Matching {len(catalog)} detected brick(s) against "
           f"{len(reference)} official brick(s) ({scope}) ...")
 
+    index = _block_index(reference)
     rows = []
     matched_ids = set()
     for brick in catalog:
         reads = [brick[c] for c in read_cols
                  if brick.get(c) and not brick[c].startswith("ERROR:")]
-        score, basis, margin, ref, read = _best_match(reads, reference,
+        # Fast path: only score references sharing a folded word with a read.
+        # A read whose every word is misspelled beyond folding shares none, so
+        # a miss falls back to the full list -- slow only for the failures.
+        pool = _candidates(reads, reference, index, args.scan_ocr)
+        score, basis, margin, ref, read = _best_match(reads, pool,
                                                       args.scan_ocr,
                                                       args.min_score)
+        if ref is None or score < args.min_score - CONTAIN_DISCOUNT:
+            if len(pool) < len(reference):
+                score, basis, margin, ref, read = _best_match(reads, reference,
+                                                              args.scan_ocr,
+                                                              args.min_score)
         min_needed = (args.min_score if basis == "text"
                       else args.min_score - CONTAIN_DISCOUNT)
         matched = (ref is not None and score >= min_needed

@@ -22,13 +22,26 @@ the join is fuzzy because the OG list is a noisy scan).
 
 Output: reference/master_list.csv, one row per original-list brick:
 
-  orig_id, new_id, section, moved, status, buyer, og_inscription,
-  new_inscription, join_score
+  orig_id, new_id, section, moved, status, buyer, og_inscription, og_alt,
+  new_inscription, join_score, og_verified, flag
 
 status is 'ok', 'no_brick' (the OG list marks some sales "NO BRICK NO
 INSCRIPTION"), or 'unjoined' (a moved brick whose text found no counterpart --
 review by hand). The reverse gaps (new-list rows no OG row claimed) are
 written alongside as master_unclaimed.csv.
+
+The v2 OG list's per-row trust markers are carried through, so the review
+pile is visible in the one file staff actually use: og_verified is v2's
+verified column ('agreed' / 'strip' / 'parse'), and flag is a ';'-joined list
+of v2's flag (e.g. 'number?:1234', 'page0') plus two added here:
+
+  dup_orig    this original number appears on more than one OG row -- a
+              residual scan id collision; inside E/F/G both copies would
+              otherwise silently claim the same physical brick
+  orig_range  the original number is impossible (outside 1..13,344)
+
+Flagged rows keep their best-effort assignment -- the flag routes them to
+human review, it does not withhold the data.
 
 Usage:
     python merge_lists.py --og reference/tsp_brick_list_v2.csv \
@@ -63,7 +76,12 @@ RESCUE_MARGIN = 0.06
 RESCUE_SURNAME_SIM = 0.65
 
 COLUMNS = ["orig_id", "new_id", "section", "moved", "status", "buyer",
-           "og_inscription", "og_alt", "new_inscription", "join_score"]
+           "og_inscription", "og_alt", "new_inscription", "join_score",
+           "og_verified", "flag"]
+
+# The brick universe: certificate numbers run 1..13,344 (same bound as
+# resolve_tsp_rows._repair_numbers). Anything outside is a misread id.
+MAX_ORIG_ID = 13344
 
 
 def _key(text: str) -> str:
@@ -197,16 +215,33 @@ def main(argv=None) -> None:
         og_rows = list(csv.DictReader(f))
     print(f"OG list: {len(og_rows)} rows;  new by-area list: {len(new_rows)} rows")
 
+    # Residual scan id collisions: the same certificate number on >1 OG row.
+    # Inside E/F/G both copies would silently claim the same physical brick,
+    # so every copy is flagged for review (at most one can be right).
+    id_counts = defaultdict(int)
+    for og in og_rows:
+        id_counts[og["assigned_id"]] += 1
+
     out_rows, claimed = [], set()
     counts = defaultdict(int)
     for og in og_rows:
         orig_id = og["assigned_id"]
         inscription = og["full_name"]
         alt = og.get("alt_name", "")
+        # Carry the v2 list's trust markers through; add merge-level checks.
+        flags = [og.get("flag", "")]
+        if id_counts[orig_id] > 1:
+            flags.append("dup_orig")
+            counts["dup_orig"] += 1
+        if not orig_id.isdigit() or not 1 <= int(orig_id) <= MAX_ORIG_ID:
+            flags.append("orig_range")
+            counts["orig_range"] += 1
         row = {"orig_id": orig_id, "new_id": "", "section": "", "moved": "",
                "status": "ok", "buyer": og["key_word"],
                "og_inscription": inscription, "og_alt": alt,
-               "new_inscription": "", "join_score": ""}
+               "new_inscription": "", "join_score": "",
+               "og_verified": og.get("verified", ""),
+               "flag": ";".join(f for f in flags if f)}
 
         # Fold before testing: the scan renders NO BRICK as e.g. "NO ERICK".
         folded = scan_fold(_normalise(inscription))
@@ -284,6 +319,12 @@ def main(argv=None) -> None:
           + (f" (incl. {counts['copy_overflow']} identical-copy overflow)"
              if counts["copy_overflow"] else ""))
     print(f"  'NO BRICK' sales                     : {counts['no_brick']}")
+    flagged = sum(1 for r in out_rows if r["flag"])
+    carried = sum(1 for r in out_rows
+                  if set(r["flag"].split(";")) - {"", "dup_orig", "orig_range"})
+    print(f"  flagged for review (flag column)     : {flagged}"
+          f" (dup ids: {counts['dup_orig']}, out-of-range: "
+          f"{counts['orig_range']}, carried from v2: {carried})")
     print(f"\nWrote {args.output}")
     print(f"New-list rows no OG row claimed: {len(unclaimed)} -> {unclaimed_path}")
 

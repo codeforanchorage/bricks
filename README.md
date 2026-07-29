@@ -325,7 +325,15 @@ on the id.
 
 `merge_lists.py` combines both lists into `reference/master_list.csv` — one
 row per original brick with `orig_id`, `new_id`, `section`, `moved`, `status`,
-`buyer`, and both inscriptions. Unmoved bricks get their section from the
+`buyer`, both inscriptions, and two review columns: `og_verified` (the v2
+list's per-row trust tier: `agreed` / `strip` / `parse`) and `flag`, a
+`;`-joined list of v2's row flags (`number?:…`, `page0`, …) plus two checks
+added at merge time — `dup_orig` (the same original number appears on more
+than one OG row: a residual scan id collision, so inside E/F/G two rows claim
+one physical brick) and `orig_range` (an impossible certificate number,
+outside 1–13,344). Flagged rows keep their best-effort assignment; the flag
+routes them to human review, it does not withhold the data. Current counts:
+1,374 rows carry a flag (308 dup-id, 3 out-of-range, 1,203 carried from v2). Unmoved bricks get their section from the
 number ranges; moved bricks are text-joined to the by-area list (word-blocked
 fuzzy match at ≥0.80, plus a stricter rescue pass — lower score but a clear
 margin over the runner-up *and* buyer-surname corroboration; identical-copy

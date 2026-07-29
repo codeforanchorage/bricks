@@ -48,8 +48,14 @@ RENDER_SCALE = 3.0
 AGREE_SIM = 0.75       # folded-text similarity that settles a row
 STRIP_PAD_PT = 5.0     # vertical padding around a row strip, PDF points
 WORKERS = 8
+# full_name keeps the embedded-text parse (structurally reliable, noisy
+# glyphs); alt_name carries the vision re-read (clean glyphs, occasionally the
+# wrong row). Neither replaces the other -- consumers match against BOTH and
+# keep whichever scores better. Adopting the re-read as the only text was
+# tried and lost 566 master-list joins: on the worst rows the model's noise
+# is worse than the scan's, and it is not scan_fold-compatible.
 COLUMNS = ["section", "assigned_id", "pos1", "pos2", "full_name", "key_word",
-           "verified", "flag"]
+           "alt_name", "verified", "flag"]
 
 STRIP_PROMPT = (
     "This is ONE row cropped from a scanned typewritten table of "
@@ -152,6 +158,39 @@ class _StripReader:
         raise RuntimeError(f"strip p{page_index} failed: {last_error}")
 
 
+def _repair_numbers(rows: list[dict]) -> int:
+    """Revert strip renumberings that collide with other rows.
+
+    The strip read is the better transcription of *text*, but on worn digits
+    it misreads brick numbers more often than the embedded OCR does -- and a
+    misread usually lands on a number some other row legitimately owns.
+    Accept a strip's renumbering only when the new number is claimed by no
+    other row (it fills a gap); otherwise revert to the parse's number and
+    downgrade the flag to 'number?:<strip>' for the review pile. Decisions
+    use the pre-repair state so they are order-independent. Returns the
+    number of rows reverted.
+    """
+    agreed = {r["assigned_id"] for r in rows if r["verified"] == "agreed"}
+    counts: dict[str, int] = {}
+    for row in rows:
+        counts[row["assigned_id"]] = counts.get(row["assigned_id"], 0) + 1
+
+    reverted = 0
+    for row in rows:
+        parts = row["flag"].split(";")
+        if not parts[0].startswith("number:"):
+            continue
+        old = parts[0].split(":", 1)[1]
+        new = row["assigned_id"]
+        plausible = new.isdigit() and 1 <= int(new) <= 13344
+        if counts[new] > 1 or new in agreed or not plausible:
+            row["assigned_id"] = old
+            parts[0] = f"number?:{new}"
+            row["flag"] = ";".join(parts)
+            reverted += 1
+    return reverted
+
+
 def main(argv=None) -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
     _load_dotenv(Path(__file__).with_name(".env"))
@@ -246,30 +285,37 @@ def main(argv=None) -> None:
     rows, counts = [], {"agreed": 0, "strip": 0, "parse": 0, "renumbered": 0}
     for entry in physical:
         number, text, buyer = entry["number"], entry["text"], entry["buyer"]
+        alt = ""
         verified, flag = "parse", entry.get("flag", "")
         if flag == "page0":
             pass                       # human review; keep the parse as-is
         elif number in confirmed:
-            clean = reocr[number]
-            number, text, buyer = number, clean["full_name"], clean["key_word"]
+            alt = reocr[number]["full_name"]
             verified = "agreed"
         elif entry.get("strip"):
             strip = entry["strip"]
             strip_number = _clean_brick_number(str(strip.get("brick", "")))
             strip_text = " ".join(str(strip.get(k, "")) for k in ("line1", "line2")).strip()
-            strip_buyer = " ".join(str(strip.get(k, "")) for k in ("last", "first")).strip()
             if strip_number:
                 if number and strip_number != number:
                     flag = f"number:{number}"
                     counts["renumbered"] += 1
                 number = strip_number
-            text, buyer, verified = strip_text or text, strip_buyer or buyer, "strip"
+            alt, verified = strip_text, "strip"
+            if not text:               # parser dropped the row entirely
+                text = strip_text
+                buyer = " ".join(str(strip.get(k, ""))
+                                 for k in ("last", "first")).strip()
         if not number or not (text or buyer):
             continue
         counts[verified] += 1
         rows.append({"section": "", "assigned_id": number, "pos1": "",
                      "pos2": "", "full_name": " ".join(text.split()),
-                     "key_word": buyer, "verified": verified, "flag": flag})
+                     "key_word": buyer, "alt_name": " ".join(alt.split()),
+                     "verified": verified, "flag": flag})
+
+    reverted = _repair_numbers(rows)
+    counts["renumbered"] -= reverted
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with open(args.output, "w", newline="", encoding="utf-8") as f:

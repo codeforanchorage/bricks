@@ -27,8 +27,8 @@ import sys
 from collections import defaultdict
 from pathlib import Path
 
-from consensus import (_match_key, _normalise, phonetic_fold, scan_fold,
-                       similar_spoken, token_containment)
+from consensus import (_match_key, _normalise, _similar, phonetic_fold,
+                       scan_fold, similar_spoken, token_containment)
 
 # Catalogue columns that are not OCR-method reads.
 _NON_READ = {"image", "brick_id", "x", "y", "w", "h", "status"}
@@ -65,7 +65,9 @@ def _load_reference(path: Path, section: str, scan_ocr: bool = False) -> list[di
     refs = []
     with open(path, newline="", encoding="utf-8") as f:
         for row in csv.DictReader(f):
+            alt = ""
             if "og_inscription" in row:   # master_list.csv
+                alt = row.get("og_alt", "")
                 row = {"section": row["section"],
                        "assigned_id": row["new_id"] or row["orig_id"],
                        "full_name": row["new_inscription"] or row["og_inscription"],
@@ -75,7 +77,19 @@ def _load_reference(path: Path, section: str, scan_ocr: bool = False) -> list[di
             # Match on the distinctive words only -- boilerplate like
             # "IN MEMORY OF" otherwise inflates similarity between bricks.
             row["_key"] = _key_for(row["full_name"], scan_ocr)
-            if row["_key"]:
+            # Second transcription of the same brick (master og_alt): score
+            # against both, keep the better -- the texts err differently.
+            # But when the two transcriptions barely resemble each other, one
+            # of them read the wrong row of the scan; matching against it
+            # would hand its neighbour's inscription to this brick, so the
+            # alt is ignored (the row itself stays in the review pile).
+            key2 = _key_for(alt, scan_ocr) if alt else ""
+            if key2 and _similar(row["_key"], key2) < 0.40:
+                key2 = ""
+            row["_key2"] = key2 if key2 != row["_key"] else ""
+            if row["_key"] or row["_key2"]:
+                if not row["_key"]:
+                    row["_key"], row["_key2"] = row["_key2"], ""
                 refs.append(row)
     return refs
 
@@ -86,6 +100,8 @@ def _block_index(reference: list[dict]) -> dict[str, list[int]]:
     index = defaultdict(list)
     for i, ref in enumerate(reference):
         words = set(ref["_key"].split())
+        if ref.get("_key2"):
+            words.update(ref["_key2"].split())
         # Index phonetic folds too, or CATHY never blocks against KATHY.
         words.update(phonetic_fold(w) for w in tuple(words))
         for word in words:
@@ -131,11 +147,15 @@ def _best_match(reads: list[str], reference: list[dict], scan_ocr: bool = False,
         for ref in reference:
             # similar_spoken: parts of the official lists were voice-
             # transcribed, so phonetic spelling variants (BRIAN/BRYAN,
-            # CATHY/KATHY) must compare as equal.
-            score = similar_spoken(key, ref["_key"])
+            # CATHY/KATHY) must compare as equal. Score against both of the
+            # row's transcriptions when it has two -- they err differently.
+            ref_keys = [ref["_key"]]
+            if ref.get("_key2"):
+                ref_keys.append(ref["_key2"])
+            score = max(similar_spoken(key, rk) for rk in ref_keys)
             basis = "text"
             if score < min_score:
-                contained = token_containment(key, ref["_key"])
+                contained = max(token_containment(key, rk) for rk in ref_keys)
                 if contained > score:
                     score, basis = contained, "tokens"
             if score > best_score:

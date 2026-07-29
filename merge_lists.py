@@ -60,7 +60,7 @@ RESCUE_MARGIN = 0.06
 RESCUE_SURNAME_SIM = 0.65
 
 COLUMNS = ["orig_id", "new_id", "section", "moved", "status", "buyer",
-           "og_inscription", "new_inscription", "join_score"]
+           "og_inscription", "og_alt", "new_inscription", "join_score"]
 
 
 def _key(text: str) -> str:
@@ -197,10 +197,11 @@ def main(argv=None) -> None:
     for og in og_rows:
         orig_id = og["assigned_id"]
         inscription = og["full_name"]
+        alt = og.get("alt_name", "")
         row = {"orig_id": orig_id, "new_id": "", "section": "", "moved": "",
                "status": "ok", "buyer": og["key_word"],
-               "og_inscription": inscription, "new_inscription": "",
-               "join_score": ""}
+               "og_inscription": inscription, "og_alt": alt,
+               "new_inscription": "", "join_score": ""}
 
         # Fold before testing: the scan renders NO BRICK as e.g. "NO ERICK".
         folded = scan_fold(_normalise(inscription))
@@ -216,9 +217,28 @@ def main(argv=None) -> None:
             counts["unmoved"] += 1
         else:
             row["moved"] = "yes"
-            og_key = _key(inscription)
-            score, second, match = ((0.0, 0.0, None) if not og_key
-                                    else _join(og_key, new_rows, index))
+            # The v2 OG list carries two transcriptions of each row (scan
+            # parse + vision re-read); join on whichever scores better. The
+            # runner-up must be a DIFFERENT new row -- when both texts pick
+            # the same brick, the weaker text's score is corroboration, not
+            # competition.
+            score, second, match = 0.0, 0.0, None
+            for text in (inscription, alt):
+                og_key = _key(text) if text else ""
+                if not og_key:
+                    continue
+                s, s2, m = _join(og_key, new_rows, index)
+                second = max(second, s2)
+                if m is None:
+                    continue
+                if match is None or m["_key"] == match["_key"]:
+                    if s > score:
+                        score, match = s, m
+                elif s > score:
+                    second = max(second, score)
+                    score, match = s, m
+                else:
+                    second = max(second, s)
             accepted = match is not None and score >= args.min_score
             rescued = (not accepted and match is not None
                        and score >= RESCUE_MIN_SCORE

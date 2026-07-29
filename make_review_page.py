@@ -284,8 +284,9 @@ def main(argv=None) -> None:
                 id_=cand["official_id"], section=cand["official_section"],
                 name=cand["official_name"], keyword=cand["official_keyword"]))
         choices.append(_radio(group, "none",
-                              "<b>None of these</b> &mdash; the brick is not "
-                              "in this list"))
+                              "<b>None of these</b> &mdash; if you can read "
+                              "any words on the brick, write them in the "
+                              "note below"))
         choices.append(_radio(group, "illegible",
                               "<b>Can&rsquo;t read the photo</b>"))
 

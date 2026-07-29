@@ -5,10 +5,13 @@ The reclaim workflow needs one row per brick that answers a visitor's
 questions: does my brick exist, what is its current number, and which section
 (-> pallet group) is it in. That takes both lists (see README):
 
-  * tsp_brick_list.csv  -- the ORIGINAL sale list: every brick, original
-    (certificate) number, buyer surname. No sections.
-  * brick_list.csv      -- the post-2008 "new brick numbers" list: relocated
+  * tsp_brick_list_v2.csv -- the ORIGINAL sale list: every brick, original
+    (certificate) number, buyer surname. No sections. The v2 build carries a
+    second transcription per row (alt_name); the plain tsp_brick_list.csv
+    parse also works.
+  * brick_list_xls.csv    -- the post-2008 "new brick numbers" list: relocated
     bricks only (areas A-D, H-K), new number + section. No buyer names.
+    (brick_list.csv, the older PDF parse, also works but lost 407 rows.)
 
 The 2009 "How to Find Your Brick" brochure supplies the bridge: bricks in
 areas E, F and G were NOT moved in 2008, and their original numbers are the
@@ -28,8 +31,8 @@ review by hand). The reverse gaps (new-list rows no OG row claimed) are
 written alongside as master_unclaimed.csv.
 
 Usage:
-    python merge_lists.py --og reference/tsp_brick_list.csv \
-        --new reference/brick_list.csv --output reference/master_list.csv
+    python merge_lists.py --og reference/tsp_brick_list_v2.csv \
+        --new reference/brick_list_xls.csv --output reference/master_list.csv
 """
 from __future__ import annotations
 
@@ -176,9 +179,11 @@ def main(argv=None) -> None:
     parser = argparse.ArgumentParser(
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--og", required=True, type=Path,
-                        help="Original by-name list (parse_tsp_list.py output)")
+                        help="Original by-name list (tsp_brick_list_v2.csv "
+                             "from resolve_tsp_rows.py)")
     parser.add_argument("--new", required=True, type=Path,
-                        help="New by-area list (parse_brick_list.py output)")
+                        help="New by-area list (brick_list_xls.csv from "
+                             "parse_xls_list.py)")
     parser.add_argument("--output", required=True, type=Path,
                         help="Master lookup CSV to write")
     parser.add_argument("--min-score", type=float, default=JOIN_MIN_SCORE,

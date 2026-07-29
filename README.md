@@ -197,7 +197,7 @@ over-merging. Use `--no-group` to see the raw detections while tuning.
 brick-ocr/
   pipeline.py          whole-image comparison pipeline + CSV writer
   brick_pipeline.py    per-brick pipeline: detect -> crop -> OCR each brick
-  single_pipeline.py   one-photo-per-brick pipeline (no detection step)
+  single_pipeline.py   one-photo-per-brick production runner (parallel, resumable)
   detect_bricks.py     classical-CV paver detector (mortar-joint grid)
   parse_xls_list.py    parse the source Excel workbook of new brick numbers
   parse_brick_list.py  parse the by-area brick-list PDF (superseded by the .xls)
@@ -216,9 +216,53 @@ brick-ocr/
   compare.py           stacked terminal comparison output
   requirements.txt     dependencies
   reference/           official Municipality brick lists (see below)
+  tests/               pytest suite incl. the 26-photo regression gate
   test_images/         input JPEGs go here
   output/              results, crops, and annotated images land here
 ```
+
+## The production batch run
+
+`single_pipeline.py` is the runner for the full warehouse batch (one photo =
+one brick). It is built to survive a ~13,000-photo run:
+
+```powershell
+python single_pipeline.py --input photos/ --output output/singles.csv --workers 8
+```
+
+- `--workers N` (default 8) OCRs images concurrently; the LLM calls are
+  network-bound, so threads scale nearly linearly (a serial run would take
+  ~8 hours; 8 workers cut it to ~1).
+- Every API call retries transient failures (429/5xx, malformed replies)
+  3 times with backoff inside the provider (`ocr_google.py` /
+  `ocr_anthropic.py`) before an `ERROR:` row is recorded.
+- Every row is flushed as it is written -- a crash or Ctrl-C loses nothing.
+- `--resume` keeps a previous run's good rows and redoes only missing images
+  and `ERROR:` rows. An *empty* read is kept (the model really saw no text);
+  an `ERROR:` read is retried.
+
+So the crash-recovery loop is simply: re-run the same command with `--resume`
+until the end-of-run summary reports no remaining ERROR reads.
+
+## Tests
+
+```powershell
+python -m pytest tests/
+```
+
+No API calls, pure CSV -- safe to run anywhere. Two layers:
+
+- **Unit tests** pin every measured matching behaviour: the scan-confusable
+  folds, the phonetic (voice-transcription) folds, token-containment scoring
+  and its uniqueness margin, identical-copy handling, the E/F/G
+  original-number ranges, NO-BRICK detection, and the resume bookkeeping.
+- **The regression gate** (`tests/test_regression_labeled.py`) replays the
+  26 labeled warehouse photos' frozen OCR reads (`tests/fixtures/`) through
+  `match.py` against the committed `reference/master_list.csv` and asserts
+  the validated outcome: every photo lands on its verified brick or in
+  review, **zero false positives**, at least 23/26 matched. Any change to the
+  matching layers -- or a master-list rebuild that breaks identification --
+  fails here first.
 
 ## The two official lists
 
@@ -285,10 +329,10 @@ row per original brick with `orig_id`, `new_id`, `section`, `moved`, `status`,
 number ranges; moved bricks are text-joined to the by-area list (word-blocked
 fuzzy match at ≥0.80, plus a stricter rescue pass — lower score but a clear
 margin over the runner-up *and* buyer-surname corroboration; identical-copy
-batches are then assigned one-to-one). Current yield with the .xls source:
-12,642 of 13,336 rows fully resolved, 675 flagged `unjoined` for review, 19
-sales recorded as "NO BRICK NO INSCRIPTION". By-area rows no OG row claimed
-land in `master_unclaimed.csv`.
+batches are then assigned one-to-one). Current yield with the v2 OG list and
+the .xls source: 12,902 of 13,389 rows fully resolved, 468 flagged `unjoined`
+for review, 19 sales recorded as "NO BRICK NO INSCRIPTION". By-area rows no OG
+row claimed land in `master_unclaimed.csv`.
 
 ```bash
 python merge_lists.py --og reference/tsp_brick_list_v2.csv \
@@ -338,8 +382,7 @@ python resolve_tsp_rows.py --pdf "TSP Bricks ALL - OG List by Name - OCR.pdf" \
 
 ## Not yet implemented (planned)
 
-Batch processing with a progress bar (parallel worker processes — better than
-more threads per image on this 24-core machine) · equirectangular→nadir
-projection from raw `.insp` files · CV brick-edge detection for layouts the
-text-proximity grouping can't resolve · section tagging (A–K) from folder
-names · Excel export.
+Equirectangular→nadir projection from raw `.insp` files · CV brick-edge
+detection for layouts the text-proximity grouping can't resolve · section
+tagging (A–K) from folder names (→ per-pallet `--section` matching) · a
+reviewer UI for the unmatched queue (photo + top candidates) · Excel export.

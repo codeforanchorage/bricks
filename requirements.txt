@@ -4,13 +4,16 @@
 # paddlepaddle publishes NO wheels for Python 3.14, so PaddleOCR cannot run
 # there. See README.md for environment setup.
 
-# --- Method 2: Claude Haiku (Anthropic API) --------------------------------
+# --- Method 2: Claude Sonnet (Anthropic API) --------------------------------
 anthropic>=0.40.0
 Pillow>=11.0.0
 pillow-heif>=0.18.0     # .heic support (iPhone photos)
 
-# --- Method 3: Gemini 2.5 Pro (Google Gemini API) --------------------------
+# --- Methods 3 & 4: Gemini 2.5 Pro / Flash (Google Gemini API) ---------------
 google-genai>=1.0.0
+
+# --- Tests (no API calls; see tests/ and README) -----------------------------
+pytest>=8.0
 
 # --- Reference data: parse the Municipality brick lists (PDF / .xls) -------
 pypdfium2>=4.0.0

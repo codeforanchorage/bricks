@@ -2,8 +2,8 @@
 
 Both LLM methods send the same image and the same prompt and expect the same
 JSON contract back, so the comparison stays fair. The provider-specific code
-(which API client, how to attach the image) lives in ocr_haiku.py and
-ocr_gemini.py; everything common lives here.
+(which API client, how to attach the image) lives in ocr_anthropic.py and
+ocr_google.py; everything common lives here.
 """
 from __future__ import annotations
 

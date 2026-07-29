@@ -203,6 +203,7 @@ brick-ocr/
   parse_brick_list.py  parse the by-area brick-list PDF (superseded by the .xls)
   parse_tsp_list.py    parse the original by-name (all bricks) PDF into a CSV
   reocr_tsp_pdf.py     re-transcribe the scanned by-name PDF with a vision LLM
+  resolve_tsp_rows.py  settle disputed rows via isolated strip reads -> v2 list
   merge_lists.py       merge both lists into the master lookup table
   match.py             match the OCR catalogue against an official list
   consensus.py         collapses a comparison CSV into a triaged catalogue
@@ -224,13 +225,25 @@ brick-ocr/
 There are two Municipality lists, and they complement each other. Neither
 alone is enough.
 
-| | `brick_list_xls.csv` (by area) | `tsp_brick_list.csv` (by name) |
+| | `brick_list_xls.csv` (by area) | `tsp_brick_list_v2.csv` (by name) |
 |---|---|---|
 | source | `TSP Bricks All.xls`, the 2008 source workbook | `TSP Bricks ALL - OG List by Name - OCR.pdf`, a scan |
-| rows | 8,281 | 13,336 |
+| rows | 8,281 | 13,389 |
 | coverage | **areas A–D and H–K only** | **all bricks, including E, F, G** |
 | gives you | the section + grid position (Column/Row) | the brick # and the **buyer's name** |
-| text quality | clean (digital source) | noisy OCR (`TOWN`→`IOWN`, `THE`→`'IHE`) |
+| text quality | clean (digital source) | two noisy transcriptions, cross-checked (see below) |
+
+The by-name list's canonical form is **v2** (`resolve_tsp_rows.py`): each row
+carries the coordinate parse of the scan's embedded text (`full_name`) *and*
+a vision-model re-read (`alt_name`) — whole-page (`reocr_tsp_pdf.py`) where
+the two agree, an isolated single-row strip where they disputed. The two
+transcriptions err in complementary ways (the parse has right rows / noisy
+glyphs; the model has clean glyphs / occasional wrong-row slips), so
+`merge_lists.py` and `match.py` score against both and keep the better —
+neither ever replaces the other. Strip renumberings are accepted only when
+they fill an unclaimed, in-range brick number; everything else stays flagged
+(`verified` / `flag` columns) for the review pile. `tsp_brick_list.csv` (the
+parse alone) is kept as the v2 build input.
 
 `brick_list_xls.csv` (from `parse_xls_list.py`) supersedes `brick_list.csv`,
 the older parse of the printed PDF (`ABCDHIJK.pdf`, a.k.a. "ABCDHIJK New
@@ -278,7 +291,7 @@ sales recorded as "NO BRICK NO INSCRIPTION". By-area rows no OG row claimed
 land in `master_unclaimed.csv`.
 
 ```bash
-python merge_lists.py --og reference/tsp_brick_list.csv \
+python merge_lists.py --og reference/tsp_brick_list_v2.csv \
     --new reference/brick_list_xls.csv --output reference/master_list.csv
 ```
 
@@ -306,15 +319,19 @@ master list by surname or inscription → *does the brick exist?* (`status`) →
 *which section / pallet group?* (`section`); photo-matching against pallets
 then confirms *present / broken* per brick.
 
-Because the by-name list is a scan, match against it with `--scan-ocr`, which
-folds the confusable letter groups (I/L/T/1/J, E/F, O/D/Q/0) on both sides:
+Because the by-name list is a scan, match against it (or the master list)
+with `--scan-ocr`, which folds the confusable letter groups (I/L/T/1/J, E/F,
+O/D/Q/0) on both sides. Rebuilding the by-name list from the PDF, in order:
 
 ```bash
 python parse_tsp_list.py --pdf "TSP Bricks ALL - OG List by Name - OCR.pdf" \
-    --output reference/tsp_brick_list.csv
-python match.py --catalog output/singles.csv \
-    --reference reference/tsp_brick_list.csv \
-    --output output/singles_tsp_matched.csv --scan-ocr
+    --output reference/tsp_brick_list.csv                      # coordinate parse
+python reocr_tsp_pdf.py --pdf "TSP Bricks ALL - OG List by Name - OCR.pdf" \
+    --pages all --output reference/tsp_reocr_full.csv \
+    --compare reference/tsp_brick_list.csv                     # whole-page re-OCR (~$2)
+python resolve_tsp_rows.py --pdf "TSP Bricks ALL - OG List by Name - OCR.pdf" \
+    --reocr reference/tsp_reocr_full.csv \
+    --output reference/tsp_brick_list_v2.csv                   # strip-resolve disputes (~$1)
 ```
 
 `--section` does not apply to the by-name list (it has no section column).

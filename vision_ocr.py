@@ -42,6 +42,15 @@ def load_jpeg_bytes(image_path: Path, max_edge: int = MAX_IMAGE_EDGE) -> bytes:
     """Load an image, downscale it to `max_edge`, return re-encoded JPEG bytes."""
     from PIL import Image
 
+    if image_path.suffix.lower() == ".heic":
+        try:
+            import pillow_heif
+            pillow_heif.register_heif_opener()
+        except ImportError as exc:
+            raise RuntimeError(
+                "Reading .heic images needs the 'pillow-heif' package. "
+                "Run: pip install -r requirements.txt") from exc
+
     with Image.open(image_path) as img:
         img = img.convert("RGB")
         longest = max(img.size)

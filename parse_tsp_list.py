@@ -91,31 +91,41 @@ def _page_rows(textpage, page_width: float) -> list[list[str]]:
 
     Returns a list of 5-element [last, first, brick#, line1, line2] rows.
     """
+    return [columns for columns, _extent in _page_rows_ex(textpage, page_width)]
+
+
+def _page_rows_ex(textpage, page_width: float) -> list[tuple[list[str], tuple]]:
+    """Like _page_rows, but each row carries its (top, bottom) y-extent in
+    PDF points -- resolve_tsp_rows.py crops row strips from the page image."""
     chars = []
     for i in range(textpage.count_chars()):
         char = textpage.get_text_range(i, 1)
         if not char.strip():
             continue
-        left, _bottom, right, top = textpage.get_charbox(i)
-        chars.append((top, left, right, char))
+        left, bottom, right, top = textpage.get_charbox(i)
+        chars.append((top, left, right, char, bottom))
     chars.sort(key=lambda c: (-c[0], c[1]))
 
     # Cluster into rows by y, comparing against the row's first character so a
     # slowly drifting baseline cannot walk one row into the next.
     rows: list[list[tuple]] = []
+    extents: list[list[float]] = []       # [max top, min bottom] per row
     row_top = None
-    for top, left, right, char in chars:
+    for top, left, right, char, bottom in chars:
         if row_top is None or abs(top - row_top) > _ROW_TOLERANCE:
             rows.append([])
+            extents.append([top, bottom])
             row_top = top
         rows[-1].append((left, right, char))
+        extents[-1][0] = max(extents[-1][0], top)
+        extents[-1][1] = min(extents[-1][1], bottom)
 
     for row in rows:
         row.sort(key=lambda c: c[0])
     col_edges = _page_edges(rows, page_width)
 
     table = []
-    for row in rows:
+    for row, extent in zip(rows, extents):
         columns = ["", "", "", "", ""]
         prev_right = None
         for left, right, char in row:
@@ -124,7 +134,7 @@ def _page_rows(textpage, page_width: float) -> list[list[str]]:
                 columns[index] += " "
             columns[index] += char
             prev_right = right
-        table.append([c.strip() for c in columns])
+        table.append(([c.strip() for c in columns], tuple(extent)))
     return table
 
 

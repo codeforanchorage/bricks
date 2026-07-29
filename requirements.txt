@@ -7,6 +7,7 @@
 # --- Method 2: Claude Haiku (Anthropic API) --------------------------------
 anthropic>=0.40.0
 Pillow>=11.0.0
+pillow-heif>=0.18.0     # .heic support (iPhone photos)
 
 # --- Method 3: Gemini 2.5 Pro (Google Gemini API) --------------------------
 google-genai>=1.0.0

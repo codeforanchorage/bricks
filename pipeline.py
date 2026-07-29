@@ -42,7 +42,8 @@ import ocr_google
 import ocr_paddle
 import tiling
 
-IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png"}
+# .heic needs pillow-heif (see vision_ocr.load_jpeg_bytes) -- iPhone default.
+IMAGE_EXTENSIONS = {".jpg", ".jpeg", ".png", ".heic"}
 CSV_COLUMNS = ["filename", "method", "brick_inscription", "confidence"]
 
 # Method key -> (CSV name, display label, provider, model id), canonical order.

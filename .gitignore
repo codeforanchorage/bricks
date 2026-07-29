@@ -8,6 +8,8 @@ __pycache__/
 
 # Brick photos / video -- not committed (add your own to test_images/)
 test_images/
+test_bricks/
+*.zip
 
 # Generated output: CSVs, crops, annotated images
 output/

@@ -12,6 +12,13 @@ it also writes that section's official bricks that no photo matched, i.e.
 candidates for lost/broken (a true list only once a section is photographed
 in full).
 
+Bricks that stay unmatched are exactly the human-review queue, so alongside
+the matched CSV a review file (review_<output name>) lists each unmatched
+brick's --top N best candidates (default 5), ranked, one row per candidate --
+duplicate-inscription copies collapsed to one entry. A reviewer (or the
+planned review UI) sees the photo plus its five most plausible bricks instead
+of re-searching the whole list.
+
 Matching is brute-force (every read vs every official name); fine for a test
 batch, would need key-word blocking to scale to the full ~13,000 bricks.
 
@@ -47,6 +54,11 @@ CONTAIN_DISCOUNT = 0.05
 MATCH_COLUMNS = ["image", "brick_id", "match_status", "match_basis", "score",
                  "official_id", "official_section", "official_name",
                  "official_keyword", "matched_read"]
+
+DEFAULT_TOP = 5
+REVIEW_COLUMNS = ["image", "brick_id", "rank", "score", "basis",
+                  "official_id", "official_section", "official_name",
+                  "official_keyword", "matched_read"]
 
 
 def _key_for(text: str, scan_ocr: bool) -> str:
@@ -168,6 +180,41 @@ def _best_match(reads: list[str], reference: list[dict], scan_ocr: bool = False,
     return best_score, best_basis, best_score - runner_up, best_ref, best_read
 
 
+def _top_candidates(reads: list[str], reference: list[dict], scan_ocr: bool,
+                    min_score: float, n: int) -> list[tuple]:
+    """Best `n` distinct-inscription candidates for one brick's reads.
+
+    This is the review-queue view of the same scoring _best_match uses: every
+    (read, reference) pair scored by whole-string similarity with a token-
+    containment fallback, but keeping the n best DIFFERENT inscriptions
+    instead of only the winner -- a brick sold in identical copies fills one
+    review slot, not all of them. No acceptance gates apply: these rows are
+    for a human, and the near-misses are exactly what the human needs to see.
+
+    Returns [(score, basis, ref_row, winning_read), ...] best-first.
+    """
+    best_by_key: dict[str, tuple] = {}
+    for read in reads:
+        key = _key_for(read, scan_ocr)
+        if not key:
+            continue
+        for ref in reference:
+            ref_keys = [ref["_key"]]
+            if ref.get("_key2"):
+                ref_keys.append(ref["_key2"])
+            score = max(similar_spoken(key, rk) for rk in ref_keys)
+            basis = "text"
+            if score < min_score:
+                contained = max(token_containment(key, rk) for rk in ref_keys)
+                if contained > score:
+                    score, basis = contained, "tokens"
+            prev = best_by_key.get(ref["_key"])
+            if prev is None or score > prev[0]:
+                best_by_key[ref["_key"]] = (score, basis, ref, read)
+    ranked = sorted(best_by_key.values(), key=lambda item: -item[0])
+    return ranked[:n]
+
+
 def main(argv=None) -> None:
     sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
@@ -189,6 +236,11 @@ def main(argv=None) -> None:
                         help="Fold OCR-confusable letters (I/L/T, E/F, O/D) on "
                              "both sides. Use with the scanned by-name list "
                              "(tsp_brick_list.csv), whose own OCR is noisy.")
+    parser.add_argument("--top", type=int, default=DEFAULT_TOP,
+                        help=f"For each unmatched brick, list its best N "
+                             f"distinct candidates in review_<output name> "
+                             f"for the human review queue (default: "
+                             f"{DEFAULT_TOP}; 0 disables)")
     args = parser.parse_args(argv)
 
     for path in (args.catalog, args.reference):
@@ -209,7 +261,7 @@ def main(argv=None) -> None:
           f"{len(reference)} official brick(s) ({scope}) ...")
 
     index = _block_index(reference)
-    rows = []
+    rows, review_rows = [], []
     matched_ids = set()
     for brick in catalog:
         reads = [brick[c] for c in read_cols
@@ -232,6 +284,26 @@ def main(argv=None) -> None:
                    and (basis == "text" or margin >= CONTAIN_MARGIN))
         if matched:
             matched_ids.add(ref["assigned_id"])
+        elif args.top > 0:
+            # The review queue: this brick needs a human, so hand them the
+            # closest distinct candidates from the WHOLE reference (not the
+            # blocked pool -- a badly misread brick shares no words with its
+            # own inscription, which is often why it is unmatched at all).
+            for rank, (c_score, c_basis, c_ref, c_read) in enumerate(
+                    _top_candidates(reads, reference, args.scan_ocr,
+                                    args.min_score, args.top), 1):
+                review_rows.append({
+                    "image": brick.get("image", ""),
+                    "brick_id": brick.get("brick_id", ""),
+                    "rank": rank,
+                    "score": f"{c_score:.2f}",
+                    "basis": c_basis,
+                    "official_id": c_ref["assigned_id"],
+                    "official_section": c_ref["section"],
+                    "official_name": c_ref["full_name"],
+                    "official_keyword": c_ref["key_word"],
+                    "matched_read": c_read,
+                })
         rows.append({
             "image": brick.get("image", ""),
             "brick_id": brick.get("brick_id", ""),
@@ -252,9 +324,19 @@ def main(argv=None) -> None:
         writer.writerows(rows)
 
     n_matched = sum(1 for r in rows if r["match_status"] == "matched")
+    n_unmatched = len(rows) - n_matched
     print(f"\n  matched   : {n_matched}/{len(rows)} detected bricks")
-    print(f"  unmatched : {len(rows) - n_matched}")
+    print(f"  unmatched : {n_unmatched}")
     print(f"\nWrote {args.output}")
+
+    if args.top > 0 and n_unmatched:
+        review_path = args.output.with_name(f"review_{args.output.name}")
+        with open(review_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=REVIEW_COLUMNS)
+            writer.writeheader()
+            writer.writerows(review_rows)
+        print(f"Review queue: {n_unmatched} unmatched brick(s), top "
+              f"{args.top} candidates each -> {review_path}")
 
     if args.section:
         missing = [r for r in reference if r["assigned_id"] not in matched_ids]

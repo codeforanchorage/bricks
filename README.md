@@ -366,10 +366,19 @@ python match.py --catalog output/singles.csv \
     --output output/matched.csv --scan-ocr
 ```
 
+Bricks that stay unmatched are the human-review queue: alongside the matched
+CSV, `match.py` writes `review_<output name>` listing each unmatched brick's
+`--top` N best candidates (default 5), ranked best-first, one row per
+candidate — identical-inscription copies collapsed to one slot, scored
+against the *whole* reference (not the word-blocked pool, since a badly
+misread brick may share no words with its own inscription). A reviewer sees
+the photo plus its five most plausible bricks instead of re-searching the
+list; `--top 0` disables it.
+
 This is the backbone of the pickup workflow: a visitor (or staff) searches the
 master list by surname or inscription → *does the brick exist?* (`status`) →
 *which section / pallet group?* (`section`); photo-matching against pallets
-then confirms *present / broken* per brick.
+then confirms *present / broken* per brick; the review file catches the rest.
 
 Because the by-name list is a scan, match against it (or the master list)
 with `--scan-ocr`, which folds the confusable letter groups (I/L/T/1/J, E/F,

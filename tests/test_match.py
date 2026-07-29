@@ -156,3 +156,61 @@ def test_section_filter_writes_missing_report(tmp_path):
     with open(missing, newline="", encoding="utf-8") as f:
         ids = [r["assigned_id"] for r in csv.DictReader(f)]
     assert ids == ["2"]   # only the unphotographed section-A brick
+
+
+# --- the review queue: top-N candidates for unmatched bricks -------------------
+
+REVIEW_REFS = [
+    {"section": "A", "assigned_id": "1", "full_name": "ALPHA BRAVO",
+     "key_word": "AB"},
+    {"section": "A", "assigned_id": "2", "full_name": "CHARLIE DELTA",
+     "key_word": "CD"},
+    {"section": "B", "assigned_id": "3", "full_name": "MAGIC RADIO",
+     "key_word": "KMAG"},                       # identical copies: must
+    {"section": "B", "assigned_id": "4", "full_name": "MAGIC RADIO",
+     "key_word": "KMAG"},                       #   fill ONE review slot
+]
+
+
+def test_unmatched_brick_gets_ranked_candidates(tmp_path):
+    rows = _run_match(
+        tmp_path,
+        [{"image": "good.jpg", "brick_id": 1, "gemini-flash": "ALPHA BRAVO"},
+         {"image": "worn.jpg", "brick_id": 1, "gemini-flash": "MAGC RASIO ZZZZZ QQQQ"}],
+        REVIEW_REFS)
+    by_image = {r["image"]: r for r in rows}
+    assert by_image["good.jpg"]["match_status"] == "matched"
+    assert by_image["worn.jpg"]["match_status"] == "unmatched"
+
+    review = tmp_path / "review_matched.csv"
+    assert review.is_file()
+    with open(review, newline="", encoding="utf-8") as f:
+        cand = list(csv.DictReader(f))
+    # Only the unmatched brick appears.
+    assert {c["image"] for c in cand} == {"worn.jpg"}
+    # 3 distinct inscriptions exist; the identical copies collapsed to one.
+    assert len(cand) == 3
+    assert sum(1 for c in cand if c["official_name"] == "MAGIC RADIO") == 1
+    # Ranked 1..n, best first, and the near-miss is rank 1.
+    assert [c["rank"] for c in cand] == ["1", "2", "3"]
+    scores = [float(c["score"]) for c in cand]
+    assert scores == sorted(scores, reverse=True)
+    assert cand[0]["official_name"] == "MAGIC RADIO"
+
+
+def test_top_limits_candidate_count(tmp_path):
+    _run_match(
+        tmp_path,
+        [{"image": "worn.jpg", "brick_id": 1, "gemini-flash": "MAGC RASIO ZZZZZ QQQQ"}],
+        REVIEW_REFS, extra_args=("--top", "2"))
+    with open(tmp_path / "review_matched.csv", newline="",
+              encoding="utf-8") as f:
+        assert len(list(csv.DictReader(f))) == 2
+
+
+def test_top_zero_disables_review_file(tmp_path):
+    _run_match(
+        tmp_path,
+        [{"image": "worn.jpg", "brick_id": 1, "gemini-flash": "MAGC RASIO ZZZZZ QQQQ"}],
+        REVIEW_REFS, extra_args=("--top", "0"))
+    assert not (tmp_path / "review_matched.csv").exists()

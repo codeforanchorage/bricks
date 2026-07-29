@@ -206,6 +206,9 @@ brick-ocr/
   resolve_tsp_rows.py  settle disputed rows via isolated strip reads -> v2 list
   merge_lists.py       merge both lists into the master lookup table
   match.py             match the OCR catalogue against an official list
+  make_review_page.py  pack the review queue into one offline review.html
+  apply_decisions.py   fold a reviewer's decisions.csv back into the catalogue
+  make_report.py       build the Parks & Rec Excel workbook (per-section)
   consensus.py         collapses a comparison CSV into a triaged catalogue
   ocr_paddle.py        PaddleOCR wrapper
   ocr_anthropic.py     Anthropic provider (Claude)
@@ -263,6 +266,49 @@ No API calls, pure CSV -- safe to run anywhere. Two layers:
   review, **zero false positives**, at least 23/26 matched. Any change to the
   matching layers -- or a master-list rebuild that breaks identification --
   fails here first.
+
+## Review and handoff workflow
+
+Everything runs on one laptop; nothing the reviewers or Parks & Rec receive
+needs Python, a server, or an install. The full loop per photo batch:
+
+```powershell
+# 1. OCR the photos (parallel, resumable -- see above)
+python single_pipeline.py --input photos/ --output output/singles.csv --workers 8
+
+# 2. Identify each photo against the master list
+python match.py --catalog output/singles.csv --reference reference/master_list.csv \
+    --output output/matched.csv --scan-ocr
+#    -> matched.csv, review_matched.csv (unmatched queue), duplicates_matched.csv (QA)
+
+# 3. Pack the review queue into ONE self-contained page and send it out
+python make_review_page.py --review output/review_matched.csv \
+    --photos photos/ --catalog output/singles.csv --output output/review.html
+```
+
+`review.html` opens in any browser, fully offline: each undecided photo is
+embedded next to its top candidates as clickable choices (plus "None of
+these" / "Can't read the photo"). Choices autosave in the browser, and one
+button downloads `decisions.csv` — the reviewer emails that single small file
+back. Multiple reviewers / sittings produce multiple decisions files; all are
+accepted below.
+
+```powershell
+# 4. Fold the human decisions back in
+python apply_decisions.py --matched output/matched.csv \
+    --decisions decisions.csv --output output/matched_final.csv
+
+# 5. Build the deliverable: the Parks & Rec Excel workbook
+python make_report.py --master reference/master_list.csv \
+    --matched output/matched_final.csv --output output/brick_report.xlsx
+```
+
+The workbook has a Summary sheet (per-section totals), an All-bricks sheet,
+and one sheet per section, each row a brick with buyer, inscription, both
+numbers, review flags, and its photo status — `Present` rows highlighted. A
+blank photo status means *not photographed yet*, which is **not** evidence a
+brick is missing until its section is photographed in full; the Summary sheet
+says so in words, because that distinction is the whole point of the count.
 
 ## The two official lists
 

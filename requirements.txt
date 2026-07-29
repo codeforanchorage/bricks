@@ -19,6 +19,9 @@ pytest>=8.0
 pypdfium2>=4.0.0
 xlrd>=2.0.0
 
+# --- Handoff: the Parks & Rec Excel workbook (make_report.py) ---------------
+openpyxl>=3.1
+
 # --- Method 1: PaddleOCR (local OCR) ---------------------------------------
 paddleocr>=3.0.0
 #

@@ -233,6 +233,12 @@ one brick). It is built to survive a ~13,000-photo run:
 python single_pipeline.py --input photos/ --output output/singles.csv --workers 8
 ```
 
+- The default method is **`gemini-lite-31`** (`gemini-3.1-flash-lite`),
+  validated 2026-07-29 on the labeled set: 26/26 matched, 0 wrong IDs —
+  including three worn bricks the previous default left in review. It
+  replaces `gemini-flash` (`gemini-2.5-flash`), which Google deprecates on
+  2026-10-16. `gemini-flash-3` (Gemini 3 Flash Preview) scored identically
+  and serves as the second-opinion/escalation method.
 - `--workers N` (default 8) OCRs images concurrently; the LLM calls are
   network-bound, so threads scale nearly linearly (a serial run would take
   ~8 hours; 8 workers cut it to ~1).
@@ -260,12 +266,12 @@ No API calls, pure CSV -- safe to run anywhere. Two layers:
   and its uniqueness margin, identical-copy handling, the E/F/G
   original-number ranges, NO-BRICK detection, and the resume bookkeeping.
 - **The regression gate** (`tests/test_regression_labeled.py`) replays the
-  26 labeled warehouse photos' frozen OCR reads (`tests/fixtures/`) through
-  `match.py` against the committed `reference/master_list.csv` and asserts
-  the validated outcome: every photo lands on its verified brick or in
-  review, **zero false positives**, at least 23/26 matched. Any change to the
-  matching layers -- or a master-list rebuild that breaks identification --
-  fails here first.
+  26 labeled warehouse photos' frozen OCR reads (`tests/fixtures/`, from the
+  production method `gemini-3.1-flash-lite`) through `match.py` against the
+  committed `reference/master_list.csv` and asserts the validated baseline:
+  **26/26 matched to the verified brick, zero false positives**. Any change
+  to the matching layers -- or a master-list rebuild that breaks
+  identification -- fails here first.
 
 ## Review and handoff workflow
 

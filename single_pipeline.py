@@ -90,8 +90,12 @@ def main(argv=None) -> None:
                              "(.jpg/.jpeg/.png/.heic)")
     parser.add_argument("--output", required=True, type=Path,
                         help="Catalogue CSV to write")
-    parser.add_argument("--methods", default="gemini-flash",
-                        help="Comma-separated methods (default: gemini-flash)")
+    parser.add_argument("--methods", default="gemini-lite-31",
+                        help="Comma-separated methods (default: gemini-lite-31 "
+                             "-- validated 2026-07-29: 26/26 labeled photos, "
+                             "0 wrong IDs; replaces the deprecated "
+                             "gemini-flash, which Google shuts down "
+                             "2026-10-16)")
     parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS,
                         help=f"Concurrent OCR workers (default: "
                              f"{DEFAULT_WORKERS}). The LLM calls are "

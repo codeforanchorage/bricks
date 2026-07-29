@@ -1,9 +1,13 @@
 """Regression gate: the 26 labeled warehouse photos against the master list.
 
-The fixtures freeze the OCR reads from the validated 2026-07-28 capture test
-(5 test_images photos read by 3 methods + 21 test_bricks photos read by
-Gemini Flash) and the human-verified outcome for each: 23 matched to a known
-brick, 3 correctly left for review, 0 false positives.
+The fixtures freeze the production baseline established 2026-07-29: all 26
+labeled photos read by gemini-3.1-flash-lite (the production method since the
+2.5-flash deprecation switch) and the verified outcome for each -- 26/26
+matched, 0 false positives. That includes the three formerly-in-review worn
+bricks, resolved by cross-model consensus during the successor validation:
+brick6 -> #2935 (HAROLD G BEATY "BUDDY"), GP010491 -> #3056 (DEWEY EDITH
+ERICKSON -- the scan's "EDI'IB" was EDITH), IMG_0473 -> #7147 (Gerald
+Humphrey).
 
 The test replays those reads through match.py against the real committed
 reference/master_list.csv -- no API calls, pure CSV -- so any change to the
@@ -65,6 +69,6 @@ def test_no_false_positives(results):
 
 
 def test_match_rate_floor(results):
-    """At least the validated 23/26 must auto-identify."""
+    """The full validated baseline must auto-identify: 26/26."""
     n = sum(1 for r in results.values() if r["match_status"] == "matched")
-    assert n >= 23
+    assert n == 26

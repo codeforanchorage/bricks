@@ -51,10 +51,21 @@ METHODS = {
     "paddle":       ("paddleocr",     "PaddleOCR (local)",  "paddle", None),
     "sonnet":       ("claude-sonnet", "Claude Sonnet 4.6",
                      "anthropic", "claude-sonnet-4-6"),
+    "sonnet-5":     ("claude-sonnet-5", "Claude Sonnet 5",
+                     "anthropic", "claude-sonnet-5"),
     "gemini-pro":   ("gemini-pro",    "Gemini 2.5 Pro",
                      "google", "gemini-2.5-pro"),
     "gemini-flash": ("gemini-flash",  "Gemini 2.5 Flash",
                      "google", "gemini-2.5-flash"),
+    # gemini-2.5-flash is deprecated by Google (shutdown 2026-10-16); these
+    # are the candidate successors, validated against the labeled photo set.
+    # (gemini-2.5-flash-lite returns 404 "no longer available to new users".)
+    "gemini-flash-3":    ("gemini-flash-3", "Gemini 3 Flash Preview",
+                          "google", "gemini-3-flash-preview"),
+    "gemini-lite-31":    ("gemini-lite-31", "Gemini 3.1 Flash-Lite",
+                          "google", "gemini-3.1-flash-lite"),
+    "gemini-lite-35":    ("gemini-lite-35", "Gemini 3.5 Flash-Lite",
+                          "google", "gemini-3.5-flash-lite"),
 }
 
 

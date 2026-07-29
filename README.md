@@ -375,6 +375,13 @@ misread brick may share no words with its own inscription). A reviewer sees
 the photo plus its five most plausible bricks instead of re-searching the
 list; `--top 0` disables it.
 
+As continuous QA, `match.py` also writes `duplicates_<output name>` whenever
+more than one photo claims the same official brick. That is either a
+duplicate photo (harmless) or a false positive — and the file's `copies`
+column (how many identical copies of that inscription exist in the reference)
+tells them apart: `n_claims > copies` means at least one claim **is** wrong.
+This audits the matcher's zero-false-positive record for free on every batch.
+
 This is the backbone of the pickup workflow: a visitor (or staff) searches the
 master list by surname or inscription → *does the brick exist?* (`status`) →
 *which section / pallet group?* (`section`); photo-matching against pallets

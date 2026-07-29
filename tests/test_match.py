@@ -214,3 +214,49 @@ def test_top_zero_disables_review_file(tmp_path):
         [{"image": "worn.jpg", "brick_id": 1, "gemini-flash": "MAGC RASIO ZZZZZ QQQQ"}],
         REVIEW_REFS, extra_args=("--top", "0"))
     assert not (tmp_path / "review_matched.csv").exists()
+
+
+# --- the duplicate-claim QA report ---------------------------------------------
+
+def test_two_photos_on_one_brick_reported(tmp_path):
+    _run_match(
+        tmp_path,
+        [{"image": "p1.jpg", "brick_id": 1, "gemini-flash": "ALPHA BRAVO"},
+         {"image": "p2.jpg", "brick_id": 1, "gemini-flash": "ALPHA BRAVO"},
+         {"image": "p3.jpg", "brick_id": 1, "gemini-flash": "CHARLIE DELTA"}],
+        REVIEW_REFS)
+    dup = tmp_path / "duplicates_matched.csv"
+    assert dup.is_file()
+    with open(dup, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    # Only the doubly-claimed brick appears; the singleton (p3) does not.
+    assert {r["image"] for r in rows} == {"p1.jpg", "p2.jpg"}
+    assert all(r["official_id"] == "1" for r in rows)
+    assert all(r["n_claims"] == "2" for r in rows)
+    # A single-copy inscription with 2 claims: at least one claim is wrong.
+    assert all(r["copies"] == "1" for r in rows)
+
+
+def test_copy_count_recorded_for_batch_bricks(tmp_path):
+    # Two photos of a 2-copy inscription both land on the same reference row
+    # (deterministic argmax) -- reported, but copies=2 tells the reviewer
+    # this is expected, not a false positive.
+    _run_match(
+        tmp_path,
+        [{"image": "p1.jpg", "brick_id": 1, "gemini-flash": "MAGIC RADIO"},
+         {"image": "p2.jpg", "brick_id": 1, "gemini-flash": "MAGIC RADIO"}],
+        REVIEW_REFS)
+    with open(tmp_path / "duplicates_matched.csv", newline="",
+              encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    assert len(rows) == 2
+    assert all(r["copies"] == "2" for r in rows)
+    assert all(r["n_claims"] == "2" for r in rows)
+
+
+def test_no_duplicates_no_file(tmp_path):
+    _run_match(
+        tmp_path,
+        [{"image": "p1.jpg", "brick_id": 1, "gemini-flash": "ALPHA BRAVO"}],
+        REVIEW_REFS)
+    assert not (tmp_path / "duplicates_matched.csv").exists()

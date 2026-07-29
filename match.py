@@ -19,6 +19,14 @@ duplicate-inscription copies collapsed to one entry. A reviewer (or the
 planned review UI) sees the photo plus its five most plausible bricks instead
 of re-searching the whole list.
 
+As continuous QA, a duplicates file (duplicates_<output name>) lists every
+official brick claimed by MORE than one photo. Two photos on one brick is
+either a duplicate photo (harmless) or a false positive (one of the reads
+matched the wrong brick) -- and when the claims exceed the number of
+identical copies of that inscription in the reference, at least one claim
+must be wrong. This audits the matcher's zero-false-positive record for free
+on every batch.
+
 Matching is brute-force (every read vs every official name); fine for a test
 batch, would need key-word blocking to scale to the full ~13,000 bricks.
 
@@ -59,6 +67,10 @@ DEFAULT_TOP = 5
 REVIEW_COLUMNS = ["image", "brick_id", "rank", "score", "basis",
                   "official_id", "official_section", "official_name",
                   "official_keyword", "matched_read"]
+
+DUP_COLUMNS = ["official_id", "official_section", "official_name",
+               "official_keyword", "copies", "n_claims",
+               "image", "brick_id", "score", "basis", "matched_read"]
 
 
 def _key_for(text: str, scan_ocr: bool) -> str:
@@ -261,8 +273,15 @@ def main(argv=None) -> None:
           f"{len(reference)} official brick(s) ({scope}) ...")
 
     index = _block_index(reference)
+    # How many identical copies of each inscription exist -- a batch brick
+    # legitimately absorbs one photo per copy before a claim is suspect.
+    copy_counts = defaultdict(int)
+    for r in reference:
+        copy_counts[r["_key"]] += 1
+
     rows, review_rows = [], []
     matched_ids = set()
+    claims = defaultdict(list)   # (section, id) -> matched photos of that brick
     for brick in catalog:
         reads = [brick[c] for c in read_cols
                  if brick.get(c) and not brick[c].startswith("ERROR:")]
@@ -284,6 +303,18 @@ def main(argv=None) -> None:
                    and (basis == "text" or margin >= CONTAIN_MARGIN))
         if matched:
             matched_ids.add(ref["assigned_id"])
+            claims[(ref["section"], ref["assigned_id"])].append({
+                "official_id": ref["assigned_id"],
+                "official_section": ref["section"],
+                "official_name": ref["full_name"],
+                "official_keyword": ref["key_word"],
+                "copies": copy_counts[ref["_key"]],
+                "image": brick.get("image", ""),
+                "brick_id": brick.get("brick_id", ""),
+                "score": f"{score:.2f}",
+                "basis": basis,
+                "matched_read": read,
+            })
         elif args.top > 0:
             # The review queue: this brick needs a human, so hand them the
             # closest distinct candidates from the WHOLE reference (not the
@@ -337,6 +368,29 @@ def main(argv=None) -> None:
             writer.writerows(review_rows)
         print(f"Review queue: {n_unmatched} unmatched brick(s), top "
               f"{args.top} candidates each -> {review_path}")
+
+    # QA: any official brick claimed by more than one photo is either a
+    # duplicate photo or a false positive; claims beyond the inscription's
+    # identical-copy count mean at least one claim IS wrong.
+    dups = {key: group for key, group in claims.items() if len(group) > 1}
+    if dups:
+        dup_rows = []
+        for key in sorted(dups):
+            group = sorted(dups[key], key=lambda c: (c["image"],
+                                                     str(c["brick_id"])))
+            dup_rows += [{**claim, "n_claims": len(group)} for claim in group]
+        dup_path = args.output.with_name(f"duplicates_{args.output.name}")
+        with open(dup_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=DUP_COLUMNS)
+            writer.writeheader()
+            writer.writerows(dup_rows)
+        over = sum(1 for group in dups.values()
+                   if len(group) > group[0]["copies"])
+        print(f"Duplicate claims: {len(dups)} brick(s) matched by more than "
+              f"one photo -> {dup_path}")
+        print(f"  (duplicate photos or false positives; {over} exceed the "
+              f"inscription's copy count -- at least one of those claims is "
+              f"wrong)")
 
     if args.section:
         missing = [r for r in reference if r["assigned_id"] not in matched_ids]

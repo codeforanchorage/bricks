@@ -39,7 +39,16 @@ _VALID_CONFIDENCE = {"high", "medium", "low"}
 
 
 def load_jpeg_bytes(image_path: Path, max_edge: int = MAX_IMAGE_EDGE) -> bytes:
-    """Load an image, downscale it to `max_edge`, return re-encoded JPEG bytes."""
+    """Load an image, downscale it to `max_edge`, return re-encoded JPEG bytes.
+
+    EXIF orientation is deliberately NOT applied. Measured 2026-07-29 on the
+    one labeled photo stored rotated (IMG_0099.jpg, orientation=6): 4 trials
+    sideways vs 4 trials exif-transposed produced 8/8 byte-identical reads --
+    the vision models are rotation-robust on engraved bricks, so transposing
+    buys nothing and would only perturb a validated pipeline. (HEIC files
+    arrive upright regardless: pillow-heif applies the container rotation on
+    decode.)
+    """
     from PIL import Image
 
     if image_path.suffix.lower() == ".heic":

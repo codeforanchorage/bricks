@@ -57,6 +57,27 @@ def _new(section, assigned_id, full_name, key_word=""):
             "pos2": "", "full_name": full_name, "key_word": key_word}
 
 
+def _run_merge(tmp_path, og_rows, new_rows):
+    """Run merge_lists.main() on synthetic lists -> (master, rows, unclaimed)."""
+    og_path, new_path = tmp_path / "og.csv", tmp_path / "new.csv"
+    for path, cols, rows in ((og_path, OG_COLS, og_rows),
+                             (new_path, NEW_COLS, new_rows)):
+        with open(path, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=cols)
+            w.writeheader()
+            w.writerows(rows)
+    out = tmp_path / "master.csv"
+    merge_lists.main(["--og", str(og_path), "--new", str(new_path),
+                      "--output", str(out)])
+    with open(out, newline="", encoding="utf-8") as f:
+        rows = list(csv.DictReader(f))
+    master = {r["orig_id"]: r for r in rows}   # dup ids: last row wins here
+    with open(tmp_path / "master_unclaimed.csv", newline="",
+              encoding="utf-8") as f:
+        unclaimed = list(csv.DictReader(f))
+    return master, rows, unclaimed
+
+
 @pytest.fixture()
 def merged(tmp_path):
     og_rows = [
@@ -79,23 +100,7 @@ def merged(tmp_path):
         _new("B", "201", "MAGIC FM RADIO", "KMAG"),
         _new("C", "300", "UNCLAIMED BRICK TEXT", "NOONE"),
     ]
-    og_path, new_path = tmp_path / "og.csv", tmp_path / "new.csv"
-    for path, cols, rows in ((og_path, OG_COLS, og_rows),
-                             (new_path, NEW_COLS, new_rows)):
-        with open(path, "w", newline="", encoding="utf-8") as f:
-            w = csv.DictWriter(f, fieldnames=cols)
-            w.writeheader()
-            w.writerows(rows)
-    out = tmp_path / "master.csv"
-    merge_lists.main(["--og", str(og_path), "--new", str(new_path),
-                      "--output", str(out)])
-    with open(out, newline="", encoding="utf-8") as f:
-        rows = list(csv.DictReader(f))
-    master = {r["orig_id"]: r for r in rows}   # dup ids: last row wins here
-    with open(tmp_path / "master_unclaimed.csv", newline="",
-              encoding="utf-8") as f:
-        unclaimed = list(csv.DictReader(f))
-    return master, rows, unclaimed
+    return _run_merge(tmp_path, og_rows, new_rows)
 
 
 def test_unmoved_rows_get_section_from_number(merged):
@@ -170,3 +175,61 @@ def test_impossible_orig_id_flagged(merged):
     row = master["26955"]
     assert "orig_range" in row["flag"].split(";")
     assert row["status"] == "unjoined"           # its text found no match
+
+
+# --- the rescue pass and identical copies --------------------------------------
+#
+# 'HANSEN FMLY BKRY EST 195' scores 0.78 against the clean inscription --
+# under the 0.80 join bar, inside the [0.70, 0.80) rescue window -- with a
+# 0.16 margin over the best DIFFERENT inscription (SUNSHINE BAKERY, 0.63).
+# The brick was sold in two identical copies: before the same-key runner-up
+# fix, the copies tied with each other, zeroed the margin, and the rescue
+# could never fire for any batch brick.
+
+RESCUE_NEW = [
+    _new("D", "400", "THE HANSEN FAMILY BAKERY EST 1985", "HANSEN"),
+    _new("D", "401", "THE HANSEN FAMILY BAKERY EST 1985", "HANSEN"),
+    _new("A", "77", "SUNSHINE BAKERY EST 1990", "SUNSHINE"),
+]
+
+
+def test_rescue_fires_for_identical_copy_batches(tmp_path):
+    master, _, _ = _run_merge(
+        tmp_path,
+        [_og("5100", "HANSEN FMLY BKRY EST 195", "HANSEN GRETA")],
+        RESCUE_NEW)
+    row = master["5100"]
+    assert row["status"] == "ok"                 # rescued, not unjoined
+    assert row["new_id"] in {"400", "401"}
+    assert row["section"] == "D"
+    assert 0.70 <= float(row["join_score"]) < 0.80   # via the rescue window
+
+
+def test_rescue_still_requires_surname_corroboration(tmp_path):
+    # Same noisy text and margin, but the buyer's surname does not appear in
+    # the candidate -- the rescue must NOT fire (this is the gate that
+    # rejects lookalike pairs).
+    master, _, _ = _run_merge(
+        tmp_path,
+        [_og("5100", "HANSEN FMLY BKRY EST 195", "ZZZZZ AAA")],
+        RESCUE_NEW)
+    assert master["5100"]["status"] == "unjoined"
+
+
+def test_copy_spread_awards_by_score_not_id(tmp_path):
+    # The real MALONEY case: two 0.9 claims own the two "KARRI MALONEY"
+    # copies; a 0.71 same-surname rescue of "BRIDGET A MALONEY" (whose brick
+    # has NO new-list row) lands on the same brick. Score-ordered spread
+    # keeps both rightful owners and overflows the weak claim to review --
+    # id-ordered spread gave Bridget a Karri brick and evicted an owner.
+    master, _, _ = _run_merge(
+        tmp_path,
+        [_og("7000", "Bl KARRI MAIDNEY", "LENHART BILL"),
+         _og("7001", "Bl KARRI MAIDNEY", "LENHART VELMA"),
+         _og("7002", "BRIDGET A MAIONEY", "MAIONEY DEBBIE")],
+        [_new("H", "400", "KARRI MALONEY", "MALONEY"),
+         _new("B", "401", "KARRI MALONEY", "MALONEY"),
+         _new("A", "77", "SUNSHINE BAKERY EST 1990", "SUNSHINE")])
+    assert {master["7000"]["new_id"], master["7001"]["new_id"]} == \
+        {"400", "401"}                            # rightful owners keep both
+    assert master["7002"]["status"] == "unjoined"  # weak rescue -> review

@@ -121,7 +121,11 @@ def _join(og_key: str, new_rows: list[dict],
     """Best new-list row for one OG inscription, via word-blocked fuzzy match.
 
     Returns (best score, runner-up score, best row) -- the runner-up gives the
-    rescue pass its uniqueness margin.
+    rescue pass its uniqueness margin. The runner-up counts only candidates
+    with a DIFFERENT inscription (same rule as match.py's _best_match):
+    identical-copy batches otherwise tie with themselves, zero the margin,
+    and can never be rescued -- a brick sold in 17 identical copies must not
+    veto its own join.
     """
     candidates = set()
     for word in set(og_key.split()):
@@ -129,10 +133,14 @@ def _join(og_key: str, new_rows: list[dict],
             candidates.update(index.get(word, ()))
     best_score, second, best_row = 0.0, 0.0, None
     for i in candidates:
-        score = _similar(og_key, new_rows[i]["_key"])
+        row = new_rows[i]
+        score = _similar(og_key, row["_key"])
         if score > best_score:
-            best_score, second, best_row = score, best_score, new_rows[i]
-        elif score > second:
+            if best_row is not None and row["_key"] != best_row["_key"]:
+                second = best_score
+            best_score, best_row = score, row
+        elif score > second and (best_row is None
+                                 or row["_key"] != best_row["_key"]):
             second = score
     return best_score, second, best_row
 
@@ -148,15 +156,22 @@ def _surname_corroborates(buyer: str, candidate: dict) -> bool:
 
 
 def _spread_identical_copies(out_rows: list[dict], new_rows: list[dict],
-                             claimed: set, counts: dict) -> None:
+                             claimed: set, counts: dict,
+                             min_score: float = JOIN_MIN_SCORE) -> None:
     """Reassign identical-inscription bricks one-to-one.
 
     Organisations bought batches of identical bricks (9x ACPA, 17x
     "98.9 MAGIC FM", ...). Independent best-matching sends every OG copy to
     the SAME new-list row; here each group of identical claims is spread
-    across that inscription's identical new-list rows instead. Which copy
-    pairs with which is arbitrary (the bricks are indistinguishable), so both
-    sides are taken in id order for determinism. OG copies beyond the new
+    across that inscription's identical new-list rows instead.
+
+    Copies are awarded in DESCENDING join-score order (ties by orig id for
+    determinism): a strong text join must never be displaced by a weaker
+    rescue that happened to land on the same brick. Measured case: two 0.90
+    claims on the two "KARRI MALONEY" copies plus a 0.71 rescue of "BRIDGET
+    A MALONEY" (whose brick has no new-list row at all) -- score order keeps
+    both Karris and overflows Bridget to review; id order handed Bridget a
+    Karri brick and overflowed a rightful owner. OG copies beyond the new
     list's copy count revert to 'unjoined' -- they have no distinct
     counterpart and should surface in review rather than silently share one.
     """
@@ -175,8 +190,9 @@ def _spread_identical_copies(out_rows: list[dict], new_rows: list[dict],
         target = next(r for r in new_rows if r["assigned_id"] == new_id)
         copies = sorted(copies_by_key[target["_key"]],
                         key=lambda r: int(r["assigned_id"].replace(",", "") or 0))
-        claimants.sort(key=lambda r: int(r["orig_id"]) if r["orig_id"].isdigit()
-                       else 0)
+        claimants.sort(key=lambda r: (
+            -float(r["join_score"] or 0.0),
+            int(r["orig_id"]) if r["orig_id"].isdigit() else 0))
         for i, row in enumerate(claimants):
             if i < len(copies):
                 ref = copies[i]
@@ -184,9 +200,13 @@ def _spread_identical_copies(out_rows: list[dict], new_rows: list[dict],
                            new_inscription=ref["full_name"])
                 claimed.add(id(ref))
             else:
+                # The overflow row came in via the main join or the rescue --
+                # keep the tally honest about which pile shrank.
+                rescued = (row["join_score"]
+                           and float(row["join_score"]) < min_score)
                 row.update(new_id="", section="", new_inscription="",
                            join_score="", status="unjoined")
-                counts["joined"] -= 1
+                counts["rescued" if rescued else "joined"] -= 1
                 counts["unjoined"] += 1
                 counts["copy_overflow"] += 1
 
@@ -295,7 +315,8 @@ def main(argv=None) -> None:
                 counts["unjoined"] += 1
         out_rows.append(row)
 
-    _spread_identical_copies(out_rows, new_rows, claimed, counts)
+    _spread_identical_copies(out_rows, new_rows, claimed, counts,
+                             args.min_score)
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with open(args.output, "w", newline="", encoding="utf-8") as f:

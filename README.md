@@ -336,8 +336,11 @@ routes them to human review, it does not withhold the data. Current counts:
 1,374 rows carry a flag (308 dup-id, 3 out-of-range, 1,203 carried from v2). Unmoved bricks get their section from the
 number ranges; moved bricks are text-joined to the by-area list (word-blocked
 fuzzy match at ≥0.80, plus a stricter rescue pass — lower score but a clear
-margin over the runner-up *and* buyer-surname corroboration; identical-copy
-batches are then assigned one-to-one). Current yield with the v2 OG list and
+margin over the best *differently-inscribed* runner-up *and* buyer-surname
+corroboration; identical-copy batches are then assigned one-to-one, strongest
+join first, so a weak rescue can never displace a rightful 1.00 owner —
+contested bricks go to the best-scoring claimant and the loser drops to
+review). Current yield with the v2 OG list and
 the .xls source: 12,902 of 13,389 rows fully resolved, 468 flagged `unjoined`
 for review, 19 sales recorded as "NO BRICK NO INSCRIPTION". By-area rows no OG
 row claimed land in `master_unclaimed.csv`.

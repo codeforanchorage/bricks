@@ -19,9 +19,10 @@ hits are shown with their era spelled out.
 With --matched (one or more matched CSVs from match.py), each brick also
 shows its photo status: photographed on which pallet, or not yet seen.
 Photographed bricks get a click-to-expand VERIFICATION panel: the brick
-photo (thumbnail, click through to full zoom), the OCR read, and the
-scanned list-row image -- so staff can catch a false-positive match by
-eye before a claimant arrives. Image URLs are relative (photos/...), so
+photo (thumbnail; clicking overlays the 2500px zoom image, fetched only
+then), the OCR read, and the scanned list-row image (click to magnify)
+-- so staff can catch a false-positive match by eye before a claimant
+arrives. Image URLs are relative (photos/...), so
 they resolve when the page is hosted next to the derivative trees and
 silently hide when offline -- search itself needs no network.
 
@@ -94,15 +95,20 @@ _PAGE = r"""<!DOCTYPE html>
         border-radius: 4px; display: block; margin-top: 6px;
         cursor: zoom-in; }
  .panel .cap { font-size: 12.5px; color: #666; margin: 3px 0 6px; }
- /* Click-to-magnify for the scanned list row: the strips are 1400px wide
-    but the panel shows them at 660px -- too small to read a worn row.
-    Tap opens a full-width overlay (hover-zoom alone fails on the counter
-    tablets); tap again or Escape closes. */
+ .panel img.photo { cursor: zoom-in; }
+ /* Click-to-magnify, one overlay for both panel images. The scan strips
+    are 1400px wide but the panel shows them at 660px -- too small to read
+    a worn row; the photo thumb is 640px but a 2500px zoom exists, loaded
+    ONLY when clicked. Tap opens the overlay (hover-zoom alone fails on
+    the counter tablets); tap again or Escape closes. */
  #zoomstrip { position: fixed; inset: 0; z-index: 10; cursor: zoom-out;
         background: rgba(20,28,36,.88); display: flex;
         align-items: center; justify-content: center; }
- #zoomstrip img { width: 97vw; max-width: none; background: #fff;
-        padding: 10px 6px; border-radius: 4px; box-sizing: border-box; }
+ #zoomstrip img { background: #fff; padding: 10px 6px; border-radius: 4px;
+        box-sizing: border-box; }
+ #zoomstrip img.wide { width: 97vw; max-width: none; }
+ #zoomstrip img.fit { max-width: 97vw; max-height: 94vh;
+        object-fit: contain; }
 </style>
 </head>
 <body>
@@ -303,11 +309,11 @@ function togglePanel(button, idx) {
   const panel = document.createElement("div");
   panel.className = "panel";
   if (hit.u) {                 // unofficial: photo only, no list row
-    const rel = encodeURI(hit.u[0]);
+    const rel = encodeURI(hit.u[0]).replace(/'/g, "%27");
     panel.innerHTML =
-      '<a href="' + PHOTO_BASE + '/zoom/' + rel + '" target="_blank">' +
       '<img class="photo" loading="lazy" src="' + PHOTO_BASE + '/thumbs/' +
-      rel + '"></a><div class="cap">Photo (click for full size) &middot; ' +
+      rel + '" onclick="magnifyPhoto(\'' + rel + '\')">' +
+      '<div class="cap">Photo (click to zoom) &middot; ' +
       "no official list row exists for this brick</div>";
     cardEl.appendChild(panel);
     return;
@@ -316,12 +322,11 @@ function togglePanel(button, idx) {
   const p = PHOTOS[r[2].toUpperCase() + "|" + (r[1] || r[0])];
   let h = "";
   if (p && p[1]) {
-    const rel = encodeURI(p[1]);
-    h += '<a href="' + PHOTO_BASE + '/zoom/' + rel + '" target="_blank">' +
-         '<img class="photo" loading="lazy" src="' + PHOTO_BASE +
-         '/thumbs/' + rel + '" onerror="this.parentNode.style.display=' +
-         "'none'" + '"></a>' +
-         '<div class="cap">Photo (click for full size) &middot; OCR read: ' +
+    const rel = encodeURI(p[1]).replace(/'/g, "%27");
+    h += '<img class="photo" loading="lazy" src="' + PHOTO_BASE +
+         '/thumbs/' + rel + '" onclick="magnifyPhoto(\'' + rel + '\')" ' +
+         'onerror="this.style.display=\'none\'">' +
+         '<div class="cap">Photo (click to zoom) &middot; OCR read: ' +
          esc(p[3] || "&mdash;") + "</div>";
   }
   h += '<img class="striprow" loading="lazy" src="' + PHOTO_BASE +
@@ -334,14 +339,20 @@ function togglePanel(button, idx) {
   cardEl.appendChild(panel);
 }
 
-function magnifyStrip(img) {
+function magnify(src, cls) {
   const ov = document.createElement("div");
   ov.id = "zoomstrip";
   const big = document.createElement("img");
-  big.src = img.src;
+  big.className = cls;
+  big.src = src;
   ov.appendChild(big);
   ov.onclick = () => ov.remove();
   document.body.appendChild(ov);
+}
+function magnifyStrip(img) { magnify(img.src, "wide"); }
+function magnifyPhoto(rel) {
+  // The 2500px zoom image is fetched only here -- never on panel open.
+  magnify(PHOTO_BASE + "/zoom/" + rel, "fit");
 }
 
 function searchNumber(digits) {

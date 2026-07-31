@@ -376,8 +376,9 @@ pytest can't:
 2. Type a misspelling ("JOLY COY") -> the right brick still ranks first.
 3. Type a brick number -> both numbering eras listed, era labelled.
 4. A photographed brick shows "at pickup site -- pallet X" and a
-   `verify` button; clicking it shows photo + OCR read + scan row, the
-   photo click-through opens the full zoom.
+   `verify` button; clicking it shows photo + OCR read + scan row.
+   Clicking the photo or the scan row magnifies it in place (the full
+   zoom image loads only on that click); click again or `Esc` closes.
 5. If any reviewer confirmed "None of these": search their brick's words
    -> an "unofficial" entry appears with pallet and note.
 

@@ -119,6 +119,11 @@ def test_photo_map_carries_the_ocr_read_for_display(tmp_path):
     assert 'onclick="magnifyStrip(this)"' in page
     assert "#zoomstrip" in page
     assert "click to magnify" in page
+    # Photo click-to-zoom: overlay handler wired, and the 2500px zoom URL
+    # is built inside magnifyPhoto -- fetched on click, never on panel open.
+    assert "magnifyPhoto(" in page
+    assert '"/zoom/"' in page
+    assert "click to zoom" in page
 
 
 def test_photo_join_keys_on_section_and_id(tmp_path):

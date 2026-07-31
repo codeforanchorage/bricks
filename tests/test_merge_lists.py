@@ -233,3 +233,25 @@ def test_copy_spread_awards_by_score_not_id(tmp_path):
     assert {master["7000"]["new_id"], master["7001"]["new_id"]} == \
         {"400", "401"}                            # rightful owners keep both
     assert master["7002"]["status"] == "unjoined"  # weak rescue -> review
+
+
+# --- wrong-row alt vetting (neighbour check) -----------------------------------
+
+def test_wrongrow_alt_is_dropped_and_flagged(tmp_path):
+    # The v2 re-read occasionally OCR'd the neighbouring scan row (the real
+    # HOWARD MARTIN #474 case, whose alt reads BARBARA S MOFFITT). An alt
+    # that fits a file-neighbour's parse clearly better than its own row is
+    # the neighbour's text: og_alt must be blanked and the row flagged. A
+    # legitimate clean re-read of a mangled parse must survive untouched.
+    og_rows = [
+        _og("200", "HOWARD MARTIN SENIOR", "MARTIN"),
+        _og("201", "BARBARA S MOFFITT HOME", "MOFFITT",
+            alt_name="HOWARD MARTIN SENIOR"),      # re-read slipped a row up
+        _og("202", "OOE FAMIIY HOMESIEAD", "DOE",
+            alt_name="DOE FAMILY HOMESTEAD"),      # legit clean re-read
+    ]
+    master, _, _ = _run_merge(tmp_path, og_rows, [])
+    assert master["201"]["og_alt"] == ""
+    assert "alt_neighbor" in master["201"]["flag"]
+    assert master["202"]["og_alt"] == "DOE FAMILY HOMESTEAD"
+    assert "alt_neighbor" not in master["202"]["flag"]

@@ -35,10 +35,13 @@ pile is visible in the one file staff actually use: og_verified is v2's
 verified column ('agreed' / 'strip' / 'parse'), and flag is a ';'-joined list
 of v2's flag (e.g. 'number?:1234', 'page0') plus two added here:
 
-  dup_orig    this original number appears on more than one OG row -- a
-              residual scan id collision; inside E/F/G both copies would
-              otherwise silently claim the same physical brick
-  orig_range  the original number is impossible (outside 1..13,344)
+  dup_orig      this original number appears on more than one OG row -- a
+                residual scan id collision; inside E/F/G both copies would
+                otherwise silently claim the same physical brick
+  orig_range    the original number is impossible (outside 1..13,344)
+  alt_neighbor  the row's vision re-read (alt) fit a NEIGHBOURING scan row
+                clearly better than its own -- a wrong-row read, so og_alt
+                is blanked (it is another brick's text)
 
 Flagged rows keep their best-effort assignment -- the flag routes them to
 human review, it does not withhold the data.
@@ -82,6 +85,19 @@ COLUMNS = ["orig_id", "new_id", "section", "moved", "status", "buyer",
 # The brick universe: certificate numbers run 1..13,344 (same bound as
 # resolve_tsp_rows._repair_numbers). Anything outside is a misread id.
 MAX_ORIG_ID = 13344
+
+# Wrong-row alt vetting: the vision re-read (alt_name) occasionally OCR'd a
+# NEIGHBOURING scan row, and because the list is alphabetical by surname the
+# stray text often still resembles this row well enough to pass match.py's
+# 0.40 alt gate -- handing the neighbour's inscription to this brick during
+# photo matching (and letting it steal text joins here). An alt that fits a
+# nearby row's parse clearly better than its own row's is the neighbour's
+# text: drop it. Measured 2026-07-31: 88 of 12,042 alts, 23 of which passed
+# the 0.40 gate; raising that gate instead would cost ~190 legitimate clean
+# re-reads by 0.60 and still let 4 through.
+NEIGHBOR_SIM = 0.60      # alt must fit the neighbour at least this well
+NEIGHBOR_MARGIN = 0.15   # ...and beat its own row's parse by this much
+_NEIGHBOR_WINDOW = 2     # scan rows to check on each side
 
 
 def _key(text: str) -> str:
@@ -132,7 +148,9 @@ def _join(og_key: str, new_rows: list[dict],
         if len(word) >= _MIN_BLOCK_WORD:
             candidates.update(index.get(word, ()))
     best_score, second, best_row = 0.0, 0.0, None
-    for i in candidates:
+    # sorted: score ties must break by list order, not by set-iteration
+    # order, or the master flip-flops between runs (hash randomisation).
+    for i in sorted(candidates):
         row = new_rows[i]
         score = _similar(og_key, row["_key"])
         if score > best_score:
@@ -143,6 +161,36 @@ def _join(og_key: str, new_rows: list[dict],
                                  or row["_key"] != best_row["_key"]):
             second = score
     return best_score, second, best_row
+
+
+def _vet_alt_neighbours(og_rows: list[dict]) -> int:
+    """Blank alts that read a neighbouring scan row; flag those rows.
+
+    og_rows arrive in scan order (v2 file order), so the plausible wrong-row
+    sources are the file neighbours. Rows whose own parse yields no key are
+    left alone -- with nothing to compare against, dropping the only usable
+    text would be guesswork. Returns the number of alts dropped.
+    """
+    keys = [_key(r["full_name"]) if r.get("full_name") else "" for r in og_rows]
+    dropped = 0
+    for i, row in enumerate(og_rows):
+        alt = row.get("alt_name", "")
+        if not alt or not keys[i]:
+            continue
+        alt_key = _key(alt)
+        if not alt_key:
+            continue
+        own = _similar(keys[i], alt_key)
+        lo, hi = max(0, i - _NEIGHBOR_WINDOW), i + _NEIGHBOR_WINDOW + 1
+        best = max((_similar(keys[j], alt_key)
+                    for j in range(lo, min(hi, len(og_rows)))
+                    if j != i and keys[j]), default=0.0)
+        if best >= NEIGHBOR_SIM and best - own >= NEIGHBOR_MARGIN:
+            row["alt_name"] = ""
+            row["flag"] = ";".join(
+                f for f in (row.get("flag", ""), "alt_neighbor") if f)
+            dropped += 1
+    return dropped
 
 
 def _surname_corroborates(buyer: str, candidate: dict) -> bool:
@@ -234,6 +282,7 @@ def main(argv=None) -> None:
     with open(args.og, newline="", encoding="utf-8") as f:
         og_rows = list(csv.DictReader(f))
     print(f"OG list: {len(og_rows)} rows;  new by-area list: {len(new_rows)} rows")
+    counts_alt_dropped = _vet_alt_neighbours(og_rows)
 
     # Residual scan id collisions: the same certificate number on >1 OG row.
     # Inside E/F/G both copies would silently claim the same physical brick,
@@ -340,6 +389,7 @@ def main(argv=None) -> None:
           + (f" (incl. {counts['copy_overflow']} identical-copy overflow)"
              if counts["copy_overflow"] else ""))
     print(f"  'NO BRICK' sales                     : {counts['no_brick']}")
+    print(f"  wrong-row alts dropped (neighbour)   : {counts_alt_dropped}")
     flagged = sum(1 for r in out_rows if r["flag"])
     carried = sum(1 for r in out_rows
                   if set(r["flag"].split(";")) - {"", "dup_orig", "orig_range"})

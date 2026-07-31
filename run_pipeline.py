@@ -15,6 +15,8 @@ The steps (each skippable) mirror the manual workflow:
                 (REVIEW_RECEIVER_URL/REVIEW_TOKEN/STAFF_LOGIN in .env)
   8. apply      apply_decisions.py (local decisions*.csv + pulled files)
   9. pages      review + search pages into output/dreamhost_upload/
+                (+ the duplicate-claim FP check page when
+                output/fp_candidates.csv exists)
  10. report     the Parks & Rec Excel workbook
 
 Configuration comes from .env (git-ignored): API keys, receiver URL and
@@ -210,6 +212,20 @@ def main(argv=None) -> None:
         make_search_page.main(["--master", "reference/master_list.csv",
                                "--matched", str(out / "pallets_final.csv"),
                                "--output", str(kit / "search.html")])
+        fp = out / "fp_candidates.csv"
+        if fp.is_file() and photo_base:
+            import make_fp_page
+            fp_args = ["--fp", str(fp),
+                       "--matched", str(out / "pallets_final.csv"),
+                       "--master", "reference/master_list.csv",
+                       "--photo-base-url", photo_base,
+                       "--output",
+                       str(kit /
+                           f"fp_review_{date.today().isoformat()}.html")]
+            if receiver_url and review_token:
+                fp_args += ["--receiver-url", receiver_url,
+                            "--receiver-token", review_token]
+            make_fp_page.main(fp_args)
 
     if "report" in run:
         _banner("Parks & Rec Excel workbook")

@@ -219,6 +219,135 @@ def test_apply_decisions_stack_kind(tmp_path):
     assert row["official_id"] == ""
 
 
+def test_apply_decisions_mismatch_kind(tmp_path):
+    # 'mismatch' (from the duplicate-claim page): a human rejected a machine
+    # match as a false positive -- the photo returns to the review queue,
+    # and the catalogue must not keep implying the rejected match was real.
+    matched = tmp_path / "matched.csv"
+    _write(matched, MATCH_COLS, [
+        {"image": "fp.jpg", "brick_id": "1", "match_status": "matched",
+         "match_basis": "text", "score": "0.83", "official_id": "1273",
+         "official_section": "F", "official_name": "BILL & LISA PETERS",
+         "official_keyword": "PETERS", "matched_read": "HI YA PETER"}])
+    decisions = tmp_path / "decisions.csv"
+    _write(decisions, ["reviewer", "image", "brick_id", "decision",
+                       "official_id", "official_section", "official_name",
+                       "official_keyword", "note"],
+           [{"reviewer": "Pat", "image": "fp.jpg", "brick_id": "1",
+             "decision": "mismatch", "official_id": "1273",
+             "official_section": "F", "note": "reads HI YA PETER"}])
+    out = tmp_path / "final.csv"
+    apply_decisions.main(["--matched", str(matched), "--decisions",
+                          str(decisions), "--output", str(out)])
+    with open(out, newline="", encoding="utf-8") as f:
+        row = list(csv.DictReader(f))[0]
+    assert row["match_status"] == "unmatched"
+    assert row["match_basis"] == "human"
+    assert row["official_id"] == "" and row["official_name"] == ""
+    assert row["reviewer"] == "Pat"
+    assert row["review_note"] == "reads HI YA PETER"
+
+
+# --- make_fp_page ----------------------------------------------------------------
+
+FP_COLS = ["official_id", "official_section", "official_name", "copies",
+           "image", "score", "matched_read"]
+
+
+def test_fp_page_groups_and_decisions(tmp_path):
+    # Two photos claim brick #1273; one is the suspected false positive.
+    # A third photo's match has SINCE moved on -- annotated, confirm
+    # targets the CURRENT match.
+    fp = tmp_path / "fp.csv"
+    _write(fp, FP_COLS, [
+        {"official_id": "1273", "official_section": "F",
+         "official_name": "BILL & LISA PETERS", "copies": "1",
+         "image": "pallets/Pallet F3/a.jpg", "score": "1.00",
+         "matched_read": "BILL & LISA PETERS"},
+        {"official_id": "1273", "official_section": "F",
+         "official_name": "BILL & LISA PETERS", "copies": "1",
+         "image": "pallets/Pallet H5/b.jpg", "score": "0.83",
+         "matched_read": "HI YA PETER"},
+        {"official_id": "500", "official_section": "F",
+         "official_name": "CATHY BIGGERSTAFF", "copies": "1",
+         "image": "pallets/Pallet H4/c.jpg", "score": "0.96",
+         "matched_read": "MARY JANE LASTUFKA"},
+    ])
+    matched = tmp_path / "matched.csv"
+    _write(matched, MATCH_COLS, [
+        {"image": "pallets/Pallet F3/a.jpg", "brick_id": "1",
+         "pallet": "Pallet F3", "match_status": "matched",
+         "official_id": "1273", "official_section": "F",
+         "official_name": "BILL & LISA PETERS",
+         "official_keyword": "PETERS"},
+        {"image": "pallets/Pallet H5/b.jpg", "brick_id": "1",
+         "pallet": "Pallet H5", "match_status": "matched",
+         "official_id": "1273", "official_section": "F",
+         "official_name": "BILL & LISA PETERS",
+         "official_keyword": "PETERS"},
+        {"image": "pallets/Pallet H4/c.jpg", "brick_id": "1",
+         "pallet": "Pallet H4", "match_status": "matched",
+         "official_id": "9999", "official_section": "F",
+         "official_name": "THE REAL LASTUFKA",
+         "official_keyword": "LASTUFKA"},
+    ])
+    master = tmp_path / "master.csv"
+    _write(master, MASTER_COLS, [
+        {"orig_id": "1273", "new_id": "", "section": "F", "moved": "no",
+         "status": "ok", "buyer": "PETERS",
+         "og_inscription": "BILL & LISA PETERS"}])
+    out = tmp_path / "fp.html"
+    import make_fp_page
+    make_fp_page.main(["--fp", str(fp), "--matched", str(matched),
+                       "--master", str(master),
+                       "--photo-base-url", "https://x.test/photos",
+                       "--output", str(out),
+                       "--receiver-url", "https://x.test/receiver.php",
+                       "--receiver-token", "sekrit"])
+    page = out.read_text(encoding="utf-8")
+    # One group band per brick, with the scanned list row for #1273.
+    assert page.count('class="group"') == 2
+    assert 'src="https://x.test/photos/strips/1273.jpg"' in page
+    # Both decision kinds present, wired for apply_decisions.
+    assert 'data-decision="match"' in page
+    assert 'data-decision="mismatch"' in page
+    # Photos are hosted thumbs -> zoom links, spaces URL-quoted.
+    assert ('src="https://x.test/photos/thumbs/'
+            'pallets/Pallet%20H5/b.jpg"') in page
+    # The moved-on match is annotated and confirm targets the CURRENT one.
+    assert "Match has since changed" in page
+    assert "THE REAL LASTUFKA" in page
+    # Receiver wiring embedded.
+    assert '"token": "sekrit"' in page
+    assert "scheduleUpload" in page
+
+
+def test_fp_page_skips_resolved_photos(tmp_path):
+    # A photo that is no longer matched (already resolved) renders as
+    # information only -- no radios, so it can't produce a decision row.
+    fp = tmp_path / "fp.csv"
+    _write(fp, FP_COLS, [
+        {"official_id": "42", "official_section": "F",
+         "official_name": "SOME BRICK", "copies": "1",
+         "image": "gone.jpg", "score": "0.9", "matched_read": "X"}])
+    matched = tmp_path / "matched.csv"
+    _write(matched, MATCH_COLS, [
+        {"image": "gone.jpg", "brick_id": "1",
+         "match_status": "unmatched"}])
+    out = tmp_path / "fp.html"
+    import make_fp_page
+    make_fp_page.main(["--fp", str(fp), "--matched", str(matched),
+                       "--photo-base-url", "https://x.test/photos",
+                       "--output", str(out)])
+    page = out.read_text(encoding="utf-8")
+    assert "No longer matched" in page
+    assert 'type="radio"' not in page
+    # Not class="item": the page JS walks every .item expecting a radio
+    # group and a note box -- an info-only .item would crash autosave.
+    assert 'class="item"' not in page
+    assert 'class="info"' in page
+
+
 def test_review_page_warns_on_missing_photo(tmp_path, capsys):
     photos = tmp_path / "photos"
     photos.mkdir()

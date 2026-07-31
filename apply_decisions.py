@@ -12,6 +12,10 @@ applied:
   illegible  -> match_status 'illegible'  (human confirmed: photo unreadable)
   stack      -> match_status 'stack_photo' (a pallet/stack overview shot,
                 not an individual brick -- nothing to match)
+  mismatch   -> match_status 'unmatched'  (human rejected a machine match
+                as a false positive -- from the duplicate-claim page,
+                make_fp_page.py; the photo returns to the review queue so
+                its real identity can be found)
 
 Every decided row also records who decided (reviewer) and their note, so the
 final catalogue is auditable. Undecided rows pass through unchanged. Multiple
@@ -32,9 +36,9 @@ from pathlib import Path
 from match import MATCH_COLUMNS
 
 FINAL_COLUMNS = MATCH_COLUMNS + ["reviewer", "review_note"]
-_DECISIONS = {"match", "none", "illegible", "stack"}
+_DECISIONS = {"match", "none", "illegible", "stack", "mismatch"}
 _STATUS = {"none": "no_match", "illegible": "illegible",
-           "stack": "stack_photo"}
+           "stack": "stack_photo", "mismatch": "unmatched"}
 
 
 def _load_decisions(paths: list[Path]) -> dict[tuple[str, str], dict]:
@@ -74,7 +78,8 @@ def main(argv=None) -> None:
     with open(args.matched, newline="", encoding="utf-8") as f:
         matched = list(csv.DictReader(f))
 
-    counts = {"match": 0, "none": 0, "illegible": 0, "stack": 0}
+    counts = {"match": 0, "none": 0, "illegible": 0, "stack": 0,
+              "mismatch": 0}
     applied = set()
     out_rows = []
     for row in matched:
@@ -119,6 +124,7 @@ def main(argv=None) -> None:
     print(f"  confirmed absent: {counts['none']}")
     print(f"  illegible photo : {counts['illegible']}")
     print(f"  stack/overview  : {counts['stack']}")
+    print(f"  false positives : {counts['mismatch']} (back to review)")
     print(f"  total matched   : {total}/{len(out_rows)}")
     print(f"\nWrote {args.output}")
 

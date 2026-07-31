@@ -207,8 +207,20 @@ brick-ocr/
   merge_lists.py       merge both lists into the master lookup table
   match.py             match the OCR catalogue against an official list
   make_review_page.py  pack the review queue into one offline review.html
+                       (--receiver-url adds autosave-to-server;
+                        --photo-base-url uses hosted derivatives instead of
+                        embedding -- required for big queues)
+  make_search_page.py  build the pickup-counter search page (search.html)
+  make_derivatives.py  build thumbs/ + zoom/ JPEG trees for Dreamhost
+  make_strips.py       render each scanned-list row as an image; review
+                       pages (--master) show it so humans read the PRINT,
+                       not the OCR of it
   apply_decisions.py   fold a reviewer's decisions.csv back into the catalogue
-  make_report.py       build the Parks & Rec Excel workbook (per-section)
+  make_report.py       build the Parks & Rec Excel workbook (per-section,
+                       reviewer notes, Unofficial-bricks sheet)
+  classify_photos.py   label unmatched photos: single brick / stack / other
+  run_pipeline.py      the whole loop in one command (see workflow below)
+  web/                 Dreamhost hosting: receiver.php + DEPLOY_DREAMHOST.md
   consensus.py         collapses a comparison CSV into a triaged catalogue
   ocr_paddle.py        PaddleOCR wrapper
   ocr_anthropic.py     Anthropic provider (Claude)
@@ -249,6 +261,26 @@ python single_pipeline.py --input photos/ --output output/singles.csv --workers 
 - `--resume` keeps a previous run's good rows and redoes only missing images
   and `ERROR:` rows. An *empty* read is kept (the model really saw no text);
   an `ERROR:` read is retried.
+- Subdirectories are walked, and two folder conventions are read back into
+  the catalogue -- needed both because the warehouse pallet labels are
+  arbitrary (K, H1..H6, ...) and do **not** encode the park section:
+
+  | layout | when | tags recorded |
+  |---|---|---|
+  | `photos/pallets/<pallet>/IMG.jpg` | section unknown (the usual case) | pallet only |
+  | `photos/<SECTION>/<pallet>/IMG.jpg` | section known at photo time | section + pallet |
+
+  A pallet-only photo simply matches against the full master list, and the
+  match itself reveals the section (every master row carries one) -- the
+  pallet tag is what the pickup counter needs to find the physical brick.
+  The `image` column is the path relative to `--input` (so repeated camera
+  filenames on different pallets stay distinct rows, including across
+  `--resume`). A flat folder of photos works exactly as before (both columns
+  empty); a nested folder matching neither convention is reported at startup
+  and its photos get no tag -- rename it before the run, not after.
+  Downstream tools treat `image` as an opaque key, so matched CSVs, the
+  review page, and decisions files join up unchanged; give
+  `make_review_page.py --photos` the same root the run used as `--input`.
 
 So the crash-recovery loop is simply: re-run the same command with `--resume`
 until the end-of-run summary reports no remaining ERROR reads.
@@ -275,8 +307,24 @@ No API calls, pure CSV -- safe to run anywhere. Two layers:
 
 ## Review and handoff workflow
 
-Everything runs on one laptop; nothing the reviewers or Parks & Rec receive
-needs Python, a server, or an install. The full loop per photo batch:
+**One command runs the whole loop** (configuration in `.env` — API keys,
+receiver URL/token, staff login, photo base URL):
+
+```powershell
+python run_pipeline.py            # ocr(resume) -> merge -> GATE -> match ->
+                                  # classify -> pull decisions -> apply ->
+                                  # pages -> Excel report
+python run_pipeline.py --rescan   # also re-read troublesome scan rows (API $)
+python run_pipeline.py --only pages,report   # regenerate outputs only
+```
+
+The regression gate runs before anything ships: if the rebuilt data breaks
+validated matching, the pipeline aborts and the previous master list is
+kept at `reference/master_list.csv.prev`. Reviewer decisions are pulled
+straight from the hosted receiver (its `action=list`/`action=fetch` GET
+API), so a hosted review round needs no manual downloads at all.
+
+The individual steps, for running by hand:
 
 ```powershell
 # 1. OCR the photos (parallel, resumable -- see above)
@@ -285,7 +333,8 @@ python single_pipeline.py --input photos/ --output output/singles.csv --workers 
 # 2. Identify each photo against the master list
 python match.py --catalog output/singles.csv --reference reference/master_list.csv \
     --output output/matched.csv --scan-ocr
-#    -> matched.csv, review_matched.csv (unmatched queue), duplicates_matched.csv (QA)
+#    -> matched.csv, review_matched.csv (unmatched queue), duplicates_matched.csv (QA),
+#       missing_<S>.csv per photographed section (lost/broken candidates)
 
 # 3. Pack the review queue into ONE self-contained page and send it out
 python make_review_page.py --review output/review_matched.csv \
@@ -315,6 +364,32 @@ numbers, review flags, and its photo status — `Present` rows highlighted. A
 blank photo status means *not photographed yet*, which is **not** evidence a
 brick is missing until its section is photographed in full; the Summary sheet
 says so in words, because that distinction is the whole point of the count.
+
+## Manual browser checks (the JS the test suite can't run)
+
+The page generators are unit-tested, but the in-browser behaviour is not.
+After regenerating pages, a two-minute pass over this list catches what
+pytest can't:
+
+**search.html** (log in, hard-refresh)
+1. Type a surname -> results appear as you type; `Esc` clears.
+2. Type a misspelling ("JOLY COY") -> the right brick still ranks first.
+3. Type a brick number -> both numbering eras listed, era labelled.
+4. A photographed brick shows "at pickup site -- pallet X" and a
+   `verify` button; clicking it shows photo + OCR read + scan row, the
+   photo click-through opens the full zoom.
+5. If any reviewer confirmed "None of these": search their brick's words
+   -> an "unofficial" entry appears with pallet and note.
+
+**review_<date>.html**
+6. Photos and candidate strip images load; hovering a strip magnifies it.
+7. Picking a candidate turns the card green; "Clear choice" un-decides
+   it; both survive a page reload (localStorage).
+8. With the receiver live: a decision shows "saved to server HH:MM"
+   within a few seconds.
+9. Stack photos sit at the bottom under the banner, one-click "Stack /
+   pallet overview photo" first, candidates still available beneath.
+10. "Download decisions.csv" produces a file with your reviewer name.
 
 ## The two official lists
 
@@ -410,7 +485,32 @@ in the inscription, for worn bricks whose read is a noisy *subset* like
 generic word set fits many bricks, a `tokens` match must also beat the best
 *differently-inscribed* candidate by a clear margin; in exchange it gets a
 slightly lower score bar. Hallucinated reads tie across several bricks and are
-rejected by the margin; distinctive subsets stand alone and pass.
+rejected by the margin; distinctive subsets stand alone and pass. A `tokens`
+winner that fails its own gate does not drag the photo to review when a
+whole-string candidate clears the normal bar on its own — a noisy containment
+tie can outscore the true text match by a hair (measured on the pallet-K test:
+"JOLY COY" hit a 0.94 tokens tie while the real *Joey Coy* stood at text
+0.93), so the matcher falls back to the best text-basis candidate.
+
+When the catalogue carries a `section` column (single_pipeline.py fills it
+from the pallet folder convention), `match.py` scopes each photo to its own
+section's bricks — plus the master rows with no section assigned, which could
+be anywhere — since the pallet says where the brick was lifted from. That
+both shrinks the candidate pool and disambiguates identical inscriptions
+sold in different sections. The whole list stays the fallback: an accepted
+cross-section match is kept but flagged `off-section` in the `section_check`
+column (mis-sorted brick or mis-tagged folder — either way a human should
+glance at it), and the end-of-run summary counts them. Review-queue
+candidates for a tagged photo come from its section too. The global
+`--section` flag overrides the per-row tags.
+
+The section tags also drive the missing-brick reports: every section with at
+least one tagged photo gets a `missing_<S>.csv` — its official bricks that no
+photo (from any section) has matched, keyed on (section, id) since bare ids
+collide across the two numbering eras. A section with no photos yet gets no
+report, because it would just list itself in full. As always, a missing list
+is only a real lost/broken list once its section is photographed in full;
+with `--section` the report covers exactly that one section instead.
 
 `match.py` accepts the master list directly, so a warehouse photo resolves to
 section + current number + buyer in one step:
@@ -462,6 +562,4 @@ python resolve_tsp_rows.py --pdf "TSP Bricks ALL - OG List by Name - OCR.pdf" \
 ## Not yet implemented (planned)
 
 Equirectangular→nadir projection from raw `.insp` files · CV brick-edge
-detection for layouts the text-proximity grouping can't resolve · section
-tagging (A–K) from folder names (→ per-pallet `--section` matching) · a
-reviewer UI for the unmatched queue (photo + top candidates) · Excel export.
+detection for layouts the text-proximity grouping can't resolve.

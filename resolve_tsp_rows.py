@@ -101,11 +101,12 @@ def _reocr_text(reocr_csv: Path) -> dict[str, dict]:
 class _StripReader:
     """Thread-safe page renderer + single-strip transcriber."""
 
-    def __init__(self, pdf_path: Path):
+    def __init__(self, pdf_path: Path, model: str = MODEL):
         import pypdfium2 as pdfium
         from google import genai
         self._pdfium = pdfium
         self._pdf_path = pdf_path
+        self._model = model
         self._client = genai.Client()
         self._pages: dict[int, object] = {}
         self._lock = threading.Lock()
@@ -125,19 +126,25 @@ class _StripReader:
 
     def read(self, page_index: int, top: float, bottom: float) -> dict:
         from google.genai import types
+
+        from strip_image import clean_strip
         image, page_h = self._page_image(page_index)
         # PDF y is bottom-up; PIL is top-down. The caller's crop window
-        # already carries its neighbour-clamped padding.
+        # already carries its neighbour-clamped padding; clean_strip then
+        # deskews and re-cuts at the ink valleys so the model sees whole
+        # characters and no neighbouring row.
         y0 = max(0, int((page_h - top) * RENDER_SCALE))
         y1 = min(image.height, int((page_h - bottom) * RENDER_SCALE))
+        with self._lock:      # PIL ops on the shared cached page image
+            strip = clean_strip(image, y0, y1)
         buf = io.BytesIO()
-        image.crop((0, y0, image.width, y1)).save(buf, "JPEG", quality=90)
+        strip.save(buf, "JPEG", quality=90)
 
         last_error = None
         for attempt in range(3):
             try:
                 response = self._client.models.generate_content(
-                    model=MODEL,
+                    model=self._model,
                     contents=[types.Part.from_bytes(data=buf.getvalue(),
                                                     mime_type="image/jpeg"),
                               STRIP_PROMPT])
@@ -156,6 +163,59 @@ class _StripReader:
                 last_error = exc
                 time.sleep(5 * (attempt + 1))
         raise RuntimeError(f"strip p{page_index} failed: {last_error}")
+
+
+def physical_rows(pdf_path: Path) -> list[dict]:
+    """Enumerate the scanned list's printed rows with single-row crop windows.
+
+    Each entry: {page, extent, crop, number, text, buyer} plus flag='page0'
+    on the preamble page (differently laid out; strips crop wrongly there).
+    Shared by the full resolve run and the targeted re-scan
+    (rescan_rows.py) so both see identical row geometry.
+    """
+    import pypdfium2 as pdfium
+
+    pdf = pdfium.PdfDocument(str(pdf_path))
+    physical = []
+    for page_index in range(len(pdf)):
+        page = pdf[page_index]
+        page_entries = []
+        for columns, extent in _page_rows_ex(page.get_textpage(),
+                                             page.get_size()[0]):
+            last, first, brick, line1, line2 = columns
+            number = _clean_brick_number(brick)
+            text = " ".join(p for p in (line1, line2) if p).strip()
+            if not number and len(re.sub(r"[^A-Za-z0-9]", "",
+                                         "".join(columns))) < 8:
+                continue      # speckle fragment
+            folded = _normalise(text + " " + last + " " + first)
+            if "line 1 line 2" in folded or "last name" in folded:
+                continue      # a table header read as data
+            page_entries.append({"page": page_index, "extent": extent,
+                                 "number": number, "text": text,
+                                 "buyer": " ".join(p for p in (last, first)
+                                                   if p)})
+
+        # A strip must contain exactly ONE printed row, or the model reads
+        # the neighbour: clamp each crop at the midpoint to the rows
+        # above/below (rows are ~11pt apart; a fixed pad spans two rows).
+        for i, entry in enumerate(page_entries):
+            top, bottom = entry["extent"]
+            if i > 0:
+                top = min(top + STRIP_PAD_PT,
+                          (page_entries[i - 1]["extent"][1] + top) / 2)
+            else:
+                top += STRIP_PAD_PT
+            if i + 1 < len(page_entries):
+                bottom = max(bottom - STRIP_PAD_PT,
+                             (page_entries[i + 1]["extent"][0] + bottom) / 2)
+            else:
+                bottom -= STRIP_PAD_PT
+            entry["crop"] = (top, bottom)
+            if page_index == 0:
+                entry["flag"] = "page0"
+            physical.append(entry)
+    return physical
 
 
 def _repair_numbers(rows: list[dict]) -> int:
@@ -206,59 +266,19 @@ def main(argv=None) -> None:
                         help="Cap strip reads (0 = no cap) -- for a dry sample")
     args = parser.parse_args(argv)
 
-    import pypdfium2 as pdfium
-
     confirmed = _confirmed_numbers(args.parse, args.reocr)
     reocr = _reocr_text(args.reocr)
     print(f"Numbers settled by whole-document agreement: {len(confirmed)}")
 
-    # Enumerate physical rows; a row is disputed unless its parsed number is
-    # confirmed. Rows with no parsable number but real text are disputed too
-    # (the parser dropped them; the 248 recovered numbers live here).
-    pdf = pdfium.PdfDocument(str(args.pdf))
-    physical, disputed = [], []
-    for page_index in range(len(pdf)):
-        page = pdf[page_index]
-        page_entries = []
-        for columns, extent in _page_rows_ex(page.get_textpage(),
-                                             page.get_size()[0]):
-            last, first, brick, line1, line2 = columns
-            number = _clean_brick_number(brick)
-            text = " ".join(p for p in (line1, line2) if p).strip()
-            if not number and len(re.sub(r"[^A-Za-z0-9]", "", "".join(columns))) < 8:
-                continue      # speckle fragment
-            folded = _normalise(text + " " + last + " " + first)
-            if "line 1 line 2" in folded or "last name" in folded:
-                continue      # a table header read as data
-            page_entries.append({"page": page_index, "extent": extent,
-                                 "number": number, "text": text,
-                                 "buyer": " ".join(p for p in (last, first) if p)})
-
-        # A strip must contain exactly ONE printed row, or the model reads the
-        # neighbour: clamp each crop at the midpoint to the rows above/below
-        # (rows are ~11pt apart; a fixed pad spans two rows).
-        for i, entry in enumerate(page_entries):
-            top, bottom = entry["extent"]
-            if i > 0:
-                top = min(top + STRIP_PAD_PT,
-                          (page_entries[i - 1]["extent"][1] + top) / 2)
-            else:
-                top += STRIP_PAD_PT
-            if i + 1 < len(page_entries):
-                bottom = max(bottom - STRIP_PAD_PT,
-                             (page_entries[i + 1]["extent"][0] + bottom) / 2)
-            else:
-                bottom -= STRIP_PAD_PT
-            entry["crop"] = (top, bottom)
-
-            physical.append(entry)
-            # Page 0 is a differently-laid-out preamble (administrative
-            # entries, multi-number lines); neither transcription is reliable
-            # there and strips crop wrongly -- leave it to human review.
-            if page_index == 0:
-                entry["flag"] = "page0"
-            elif entry["number"] not in confirmed:
-                disputed.append(entry)
+    # A row is disputed unless its parsed number is confirmed. Rows with no
+    # parsable number but real text are disputed too (the parser dropped
+    # them; the 248 recovered numbers live here). Page 0 is a differently-
+    # laid-out preamble -- neither transcription is reliable there, so it
+    # stays with the parse for human review.
+    physical = physical_rows(args.pdf)
+    disputed = [entry for entry in physical
+                if entry.get("flag") != "page0"
+                and entry["number"] not in confirmed]
 
     print(f"Physical rows: {len(physical)}; disputed -> strip reads: "
           f"{len(disputed)}")

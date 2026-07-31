@@ -113,6 +113,12 @@ def test_photo_map_carries_the_ocr_read_for_display(tmp_path):
     assert '/thumbs/' in page and '/strips/' in page
     # Image path stored thumb-ready: .JPG source -> .jpg derivative name.
     assert photos["K|5"][1].endswith(".jpg")
+    # Strip click-to-magnify: handler, overlay style, and caption hint all
+    # present (strips render at 660px but are 1400px scans -- staff must be
+    # able to read a worn row on the counter tablet).
+    assert 'onclick="magnifyStrip(this)"' in page
+    assert "#zoomstrip" in page
+    assert "click to magnify" in page
 
 
 def test_photo_join_keys_on_section_and_id(tmp_path):

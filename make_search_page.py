@@ -91,8 +91,18 @@ _PAGE = r"""<!DOCTYPE html>
  .panel img.photo { max-width: 640px; width: 100%; border-radius: 6px;
         display: block; }
  .panel img.striprow { max-width: 660px; width: 100%; border: 1px solid #eee;
-        border-radius: 4px; display: block; margin-top: 6px; }
+        border-radius: 4px; display: block; margin-top: 6px;
+        cursor: zoom-in; }
  .panel .cap { font-size: 12.5px; color: #666; margin: 3px 0 6px; }
+ /* Click-to-magnify for the scanned list row: the strips are 1400px wide
+    but the panel shows them at 660px -- too small to read a worn row.
+    Tap opens a full-width overlay (hover-zoom alone fails on the counter
+    tablets); tap again or Escape closes. */
+ #zoomstrip { position: fixed; inset: 0; z-index: 10; cursor: zoom-out;
+        background: rgba(20,28,36,.88); display: flex;
+        align-items: center; justify-content: center; }
+ #zoomstrip img { width: 97vw; max-width: none; background: #fff;
+        padding: 10px 6px; border-radius: 4px; box-sizing: border-box; }
 </style>
 </head>
 <body>
@@ -316,10 +326,22 @@ function togglePanel(button, idx) {
   }
   h += '<img class="striprow" loading="lazy" src="' + PHOTO_BASE +
        '/strips/' + encodeURIComponent(r[0]) + '.jpg" ' +
+       'onclick="magnifyStrip(this)" ' +
        'onerror="this.style.display=\'none\'">' +
-       '<div class="cap">Row in the scanned official list</div>';
+       '<div class="cap">Row in the scanned official list ' +
+       "(click to magnify)</div>";
   panel.innerHTML = h;
   cardEl.appendChild(panel);
+}
+
+function magnifyStrip(img) {
+  const ov = document.createElement("div");
+  ov.id = "zoomstrip";
+  const big = document.createElement("img");
+  big.src = img.src;
+  ov.appendChild(big);
+  ov.onclick = () => ov.remove();
+  document.body.appendChild(ov);
 }
 
 function searchNumber(digits) {
@@ -385,6 +407,9 @@ document.getElementById("q").addEventListener("input", () => {
 });
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") {
+    // A magnified strip swallows the first Escape; search clears on the next.
+    const ov = document.getElementById("zoomstrip");
+    if (ov) { ov.remove(); return; }
     const box = document.getElementById("q");
     box.value = ""; box.focus(); run();
   }

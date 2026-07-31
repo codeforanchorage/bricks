@@ -10,6 +10,8 @@ applied:
                 official_* filled from the reviewer's chosen candidate
   none       -> match_status 'no_match'   (human confirmed: not in the list)
   illegible  -> match_status 'illegible'  (human confirmed: photo unreadable)
+  stack      -> match_status 'stack_photo' (a pallet/stack overview shot,
+                not an individual brick -- nothing to match)
 
 Every decided row also records who decided (reviewer) and their note, so the
 final catalogue is auditable. Undecided rows pass through unchanged. Multiple
@@ -30,7 +32,9 @@ from pathlib import Path
 from match import MATCH_COLUMNS
 
 FINAL_COLUMNS = MATCH_COLUMNS + ["reviewer", "review_note"]
-_DECISIONS = {"match", "none", "illegible"}
+_DECISIONS = {"match", "none", "illegible", "stack"}
+_STATUS = {"none": "no_match", "illegible": "illegible",
+           "stack": "stack_photo"}
 
 
 def _load_decisions(paths: list[Path]) -> dict[tuple[str, str], dict]:
@@ -70,7 +74,7 @@ def main(argv=None) -> None:
     with open(args.matched, newline="", encoding="utf-8") as f:
         matched = list(csv.DictReader(f))
 
-    counts = {"match": 0, "none": 0, "illegible": 0}
+    counts = {"match": 0, "none": 0, "illegible": 0, "stack": 0}
     applied = set()
     out_rows = []
     for row in matched:
@@ -93,8 +97,7 @@ def main(argv=None) -> None:
             else:
                 # Human-confirmed dead ends keep their machine candidates
                 # blank -- the catalogue must not imply a near-match was real.
-                row.update(match_status="no_match" if kind == "none"
-                           else "illegible",
+                row.update(match_status=_STATUS[kind],
                            match_basis="human", score="",
                            official_id="", official_section="",
                            official_name="", official_keyword="")
@@ -115,6 +118,7 @@ def main(argv=None) -> None:
     print(f"\n  human-matched   : {counts['match']}")
     print(f"  confirmed absent: {counts['none']}")
     print(f"  illegible photo : {counts['illegible']}")
+    print(f"  stack/overview  : {counts['stack']}")
     print(f"  total matched   : {total}/{len(out_rows)}")
     print(f"\nWrote {args.output}")
 

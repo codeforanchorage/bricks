@@ -24,6 +24,14 @@ built to survive one:
     are missing or whose reads all failed (ERROR: rows -- transient API
     failures), so a crash at photo 12,000 does not restart from zero.
   * every row is flushed as it is written; Ctrl-C loses nothing already done.
+  * subdirectories are walked, and the warehouse folder conventions
+    photos/<SECTION>/<pallet>/IMG.jpg (section known) and
+    photos/pallets/<pallet>/IMG.jpg (section unknown -- pallet labels are
+    arbitrary, the match reveals the section) are read back into the
+    catalogue: the `image` column is the path relative to --input (so
+    IMG_0001.jpg on two pallets never collide), and `section` / `pallet`
+    columns record where the photo was taken. Photos in a flat folder work
+    exactly as before (both columns empty).
 """
 from __future__ import annotations
 
@@ -37,6 +45,46 @@ from brick_pipeline import _ocr_crop, _status
 from pipeline import METHODS, _load_dotenv, find_images
 
 DEFAULT_WORKERS = 8
+
+# Valid warehouse section letters (Town Square areas A-K).
+SECTION_LETTERS = set("ABCDEFGHIJK")
+
+
+def _photo_meta(image: Path, root: Path) -> tuple[str, str, str]:
+    """(catalogue name, section, pallet) for one photo under --input.
+
+    Two folder conventions are read, because the warehouse pallet labels
+    are arbitrary (K, H1..H6, ...) and do NOT encode the park section:
+
+      photos/<SECTION>/<pallet>/IMG.jpg   section known at photo time
+        e.g. photos/H/K/IMG_0421.jpg -> ("H/K/IMG_0421.jpg", "H", "K")
+      photos/pallets/<pallet>/IMG.jpg     section unknown -- the usual case
+        e.g. photos/pallets/K/IMG_0421.jpg
+          -> ("pallets/K/IMG_0421.jpg", "", "K")
+
+    A pallet-only photo matches against the full master list and the match
+    itself reveals the section (every master row carries one) -- the pallet
+    tag is what the pickup counter needs to find the physical brick.
+
+    The catalogue name is the path relative to --input (POSIX slashes), so
+    identical camera filenames on different pallets stay distinct rows --
+    match.py, the review page, and apply_decisions.py all treat it as an
+    opaque key, and the review page resolves it under --photos unchanged.
+    A photo directly in a section folder gets a section but no pallet; a
+    photo at the top level (the flat pre-convention layout) gets neither.
+    A first folder that is neither a section letter A-K nor `pallets`
+    yields no tags at all -- the folder was not following the convention,
+    so guessing a pallet from it would tag the row with junk.
+    """
+    rel = image.relative_to(root)
+    folders = rel.parts[:-1]
+    section, pallet = "", ""
+    if folders and folders[0].upper() in SECTION_LETTERS:
+        section = folders[0].upper()
+        pallet = folders[1] if len(folders) >= 2 else ""
+    elif len(folders) >= 2 and folders[0].lower() == "pallets":
+        pallet = folders[1]
+    return rel.as_posix(), section, pallet
 
 
 def _keep_previous_rows(path: Path, method_keys: list[str],
@@ -64,10 +112,13 @@ def _keep_previous_rows(path: Path, method_keys: list[str],
     return keep, seen
 
 
-def _ocr_image(image: Path, method_keys: list[str]) -> tuple[Path, dict]:
+def _ocr_image(job: tuple[Path, str, str, str],
+               method_keys: list[str]) -> tuple[Path, dict]:
     """OCR one whole image with every requested method -> its catalogue row."""
+    image, rel, section, pallet = job
     reads = {m: _ocr_crop(image, m)[0] for m in method_keys}
-    row = {"image": image.name, "brick_id": 1,
+    row = {"image": rel, "brick_id": 1,
+           "section": section, "pallet": pallet,
            "x": "", "y": "", "w": "", "h": "",
            "status": _status(reads)}
     for m in method_keys:
@@ -87,7 +138,10 @@ def main(argv=None) -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--input", required=True, type=Path,
                         help="Directory of single-brick photos "
-                             "(.jpg/.jpeg/.png/.heic)")
+                             "(.jpg/.jpeg/.png/.heic); subfolders are "
+                             "walked, and <SECTION>/<pallet>/ or "
+                             "pallets/<pallet>/ folder names become the "
+                             "section/pallet columns")
     parser.add_argument("--output", required=True, type=Path,
                         help="Catalogue CSV to write")
     parser.add_argument("--methods", default="gemini-lite-31",
@@ -122,23 +176,35 @@ def main(argv=None) -> None:
               "(the PaddleOCR engine is not thread-safe)")
         workers = 1
 
-    images = find_images(args.input)
+    images = find_images(args.input, recursive=True)
     if not images:
         raise SystemExit(f"No images (.jpg/.jpeg/.png/.heic) found in "
                          f"{args.input}")
+    jobs = [(image, *_photo_meta(image, args.input)) for image in images]
+
+    # Nested photos whose folders follow neither convention (a section
+    # letter A-K, or pallets/<pallet>/) get no tags -- say so up front,
+    # while the folders can still be renamed cheaply, instead of after a
+    # 13,000-photo run.
+    untagged = sorted({job[1].split("/")[0] for job in jobs
+                       if "/" in job[1] and not job[2] and not job[3]})
+    if untagged:
+        print(f"note: subfolder(s) matching neither <SECTION A-K>/ nor "
+              f"pallets/<pallet>/, their photos get no section/pallet "
+              f"tag: {', '.join(untagged)}")
 
     # x/y/w/h are kept for format compatibility; the brick is the whole frame.
-    columns = (["image", "brick_id", "x", "y", "w", "h"]
+    columns = (["image", "brick_id", "section", "pallet", "x", "y", "w", "h"]
                + [METHODS[m][0] for m in method_keys] + ["status"])
 
     kept_rows: list[dict] = []
     if args.resume and args.output.is_file():
         kept_rows, done = _keep_previous_rows(args.output, method_keys, columns)
-        images = [p for p in images if p.name not in done]
+        jobs = [job for job in jobs if job[1] not in done]
         print(f"Resuming: {len(kept_rows)} good row(s) kept, "
-              f"{len(images)} image(s) left to OCR")
+              f"{len(jobs)} image(s) left to OCR")
 
-    print(f"Found {len(images)} image(s) to process; methods: "
+    print(f"Found {len(jobs)} image(s) to process; methods: "
           f"{', '.join(METHODS[m][1] for m in method_keys)}; "
           f"workers: {workers}")
 
@@ -152,8 +218,8 @@ def main(argv=None) -> None:
         f.flush()
 
         with ThreadPoolExecutor(max_workers=workers) as pool:
-            futures = [pool.submit(_ocr_image, image, method_keys)
-                       for image in images]
+            futures = [pool.submit(_ocr_image, job, method_keys)
+                       for job in jobs]
             try:
                 for future in as_completed(futures):
                     image, row = future.result()
@@ -163,7 +229,7 @@ def main(argv=None) -> None:
                     if any(str(row[METHODS[m][0]]).startswith("ERROR:")
                            for m in method_keys):
                         error_count += 1
-                    print(f"  [{done_count}/{len(images)}] {image.name}: "
+                    print(f"  [{done_count}/{len(jobs)}] {row['image']}: "
                           f"[{row['status']}] {row[first_col]}", flush=True)
             except KeyboardInterrupt:
                 pool.shutdown(wait=False, cancel_futures=True)

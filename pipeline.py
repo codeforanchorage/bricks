@@ -89,13 +89,19 @@ def _load_dotenv(path: Path) -> None:
             os.environ.setdefault(key, value)
 
 
-def find_images(input_dir: Path) -> list[Path]:
-    """Return every supported image file in `input_dir`, sorted by name."""
+def find_images(input_dir: Path, recursive: bool = False) -> list[Path]:
+    """Return every supported image file in `input_dir`, sorted by path.
+
+    With recursive=True subdirectories are walked too (the warehouse photo
+    convention nests photos in section/pallet folders, e.g. H/pallet-12/).
+    """
     if not input_dir.is_dir():
         raise SystemExit(f"Input directory not found: {input_dir}")
+    walk = input_dir.rglob("*") if recursive else input_dir.iterdir()
     return sorted(
-        p for p in input_dir.iterdir()
-        if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS
+        (p for p in walk
+         if p.is_file() and p.suffix.lower() in IMAGE_EXTENSIONS),
+        key=lambda p: p.relative_to(input_dir).as_posix(),
     )
 
 

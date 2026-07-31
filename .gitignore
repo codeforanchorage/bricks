@@ -9,7 +9,15 @@ __pycache__/
 # Brick photos / video -- not committed (add your own to test_images/)
 test_images/
 test_bricks/
+photos/
+derivatives/
 *.zip
+
+# Deployed receiver copy with the real token (commit only the CHANGE-ME one)
+web/receiver.local.php
+
+# Reviewer decision files (carry reviewer names; live data, not source)
+decisions*.csv
 
 # Generated output: CSVs, crops, annotated images
 output/
@@ -17,6 +25,9 @@ output/
 # Scratch
 frames/
 _one/
+*.prev
+*.bak
+test_strip.jpg
 
 # Raw reference PDFs (re-downloadable from muni.org/Departments/parks --
 # TownSquareBricks.aspx; the parsed CSVs are committed)

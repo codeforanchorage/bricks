@@ -14,7 +14,8 @@ hosting (PHP already enabled for WordPress) — no added cost.
    ```
    ~/bricks.<domain>/          <- web root (Dreamhost creates it)
        search.html
-       review_2026-07-29.html
+       review.html
+       fp_review.html
        receiver.php
        .htaccess
    ~/brick_data/               <- OUTSIDE the web root; receiver writes here
@@ -51,7 +52,7 @@ hosting (PHP already enabled for WordPress) — no added cost.
 # build the review page wired to the server
 python make_review_page.py --review output/review_matched.csv `
     --photos photos/ --catalog output/singles.csv `
-    --output output/review_2026-07-29.html `
+    --output output/review.html `
     --receiver-url https://bricks.<domain>/receiver.php `
     --receiver-token <the token>
 
@@ -60,10 +61,14 @@ python make_search_page.py --master reference/master_list.csv `
     --matched output/singles_matched.csv --output output/search.html
 ```
 
-Upload both via SFTP. **Version-stamp the review filename** (the date is
-in the name above) — browser caching served reviewers stale pages during
-testing. `search.html` can keep its name, but bump it the same way if
-staff report seeing old data.
+Upload both via SFTP. **Keep the stable filenames** (`search.html`,
+`review.html`, `fp_review.html`): the pages' shared nav bar links them to
+each other by these names, and one basic-auth login covers all three.
+Stale-cache worries are handled by `.htaccess`, which serves every
+`.html` with `Cache-Control: no-cache` (browser caching served reviewers
+stale pages before that header existed — the old fix was date-stamped
+filenames; the header replaced it). Each page shows its build date in
+the nav bar, so staff can confirm they're seeing the latest upload.
 
 Reviewers just get the URL (plus the shared login). Their clicks autosave
 to the server every few seconds ("saved to server HH:MM" appears in the
@@ -105,7 +110,7 @@ python make_review_page.py --review output/review_matched.csv `
     --photo-base-url https://bricks.<domain>/photos `
     --receiver-url https://bricks.<domain>/receiver.php `
     --receiver-token <the token> `
-    --output output/review_2026-07-29.html
+    --output output/review.html
 ```
 
 Derivatives are ~2500px "zoom" JPEGs plus ~640px thumbs (~8-15 GB total),

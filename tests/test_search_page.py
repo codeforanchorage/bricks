@@ -178,6 +178,21 @@ def test_notes_and_unofficial_bricks_are_baked_in(tmp_path):
     assert "unofficial" in page                        # card + help text
 
 
+def test_nav_bar_links_sibling_pages(tmp_path):
+    # The three hosted pages live in one basic-auth directory: one login,
+    # then the nav bar clicks between them. Links are relative and use the
+    # STABLE filenames run_pipeline.py writes (pagenav.py is the contract).
+    page = _build(tmp_path, [
+        {"orig_id": "5", "new_id": "", "section": "K", "moved": "no",
+         "status": "ok", "buyer": "COY", "og_inscription": "JOEY COY"}])
+    assert 'id="pagenav"' in page
+    assert '<a href="review.html">' in page
+    assert '<a href="fp_review.html">' in page
+    # You-are-here entry is text, never a self-link.
+    assert '<a href="search.html">' not in page
+    assert '<span class="here">Search</span>' in page
+
+
 def test_duplicate_photos_of_one_brick_are_counted_not_duplicated(tmp_path):
     page = _build(
         tmp_path,

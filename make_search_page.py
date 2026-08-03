@@ -42,6 +42,7 @@ from pathlib import Path
 
 from consensus import _CONFUSABLE, _STOPWORDS, _normalise, _similar
 from hostpaths import derivative_rel
+from pagenav import NAV_CSS, nav_html
 
 # Row layout baked into the page (arrays, not objects: ~40% smaller).
 # og_display: the better-looking of the by-name list's two transcriptions --
@@ -109,10 +110,11 @@ _PAGE = r"""<!DOCTYPE html>
  #zoomstrip img.wide { width: 97vw; max-width: none; }
  #zoomstrip img.fit { max-width: 97vw; max-height: 94vh;
         object-fit: contain; }
-</style>
+__NAVCSS__</style>
 </head>
 <body>
 <header>
+ __NAV__
  <h1>Town Square bricks &mdash; pickup counter search</h1>
  <div class="stamp">__STAMP__</div>
 </header>
@@ -518,6 +520,8 @@ def main(argv=None) -> None:
              + " · works offline")
 
     page = (_PAGE
+            .replace("__NAVCSS__", NAV_CSS)
+            .replace("__NAV__", nav_html("search.html"))
             .replace("__STAMP__", stamp)
             .replace("__DATA__", _json(rows))
             .replace("__PHOTOS__", _json(photos))
@@ -530,8 +534,9 @@ def main(argv=None) -> None:
     size_mb = args.output.stat().st_size / 1e6
     print(f"Wrote {args.output}  ({len(rows):,} bricks, "
           f"{len(photos):,} with photos, {size_mb:.1f} MB)")
-    print("Hosting tip: version-stamp the uploaded filename "
-          "(e.g. search_2026-07-29.html) -- browser caching bit us before.")
+    print("Hosting note: keep the stable filenames (search.html, "
+          "review.html, fp_review.html) -- the nav bar links them, and "
+          "the .htaccess serves HTML no-cache so they never go stale.")
 
 
 if __name__ == "__main__":

@@ -382,7 +382,7 @@ pytest can't:
 5. If any reviewer confirmed "None of these": search their brick's words
    -> an "unofficial" entry appears with pallet and note.
 
-**review_<date>.html**
+**review.html**
 6. Photos and candidate strip images load; hovering a strip magnifies it.
 7. Picking a candidate turns the card green; "Clear choice" un-decides
    it; both survive a page reload (localStorage).
@@ -391,6 +391,12 @@ pytest can't:
 9. Stack photos sit at the bottom under the banner, one-click "Stack /
    pallet overview photo" first, candidates still available beneath.
 10. "Download decisions.csv" produces a file with your reviewer name.
+
+**all three pages** (search.html, review.html, fp_review.html)
+11. The header nav bar clicks through to the other two pages without a
+    second login prompt (one basic-auth realm covers the directory);
+    review.html and fp_review.html show today's date as "built ..." in
+    the nav.
 
 ## The two official lists
 

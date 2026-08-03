@@ -40,11 +40,13 @@ import csv
 import html
 import json
 import sys
+from datetime import date
 from pathlib import Path
 from urllib.parse import quote
 
 from make_review_page import (_PAGE_BOTTOM, _hosted_photo_html,
                               _load_strip_map, _radio)
+from pagenav import NAV_CSS, nav_html
 
 _PAGE_TOP = """<!DOCTYPE html>
 <html lang="en">
@@ -95,10 +97,11 @@ _PAGE_TOP = """<!DOCTYPE html>
          border: 1px solid #ccc; border-radius: 5px; background: #f7f7f7;
          cursor: pointer; color: #555; }}
  button.clear:hover {{ background: #fbeaea; border-color: #d99; }}
-</style>
+{nav_css}</style>
 </head>
 <body>
 <header>
+ {nav}
  <h1>Town Square duplicate-claim check &mdash; {n_groups} brick(s),
      {n_photos} photo(s)</h1>
  <p>Each yellow band is ONE official brick that several photos matched,
@@ -302,7 +305,10 @@ def main(argv=None) -> None:
 
     receiver = ({"url": args.receiver_url, "token": args.receiver_token}
                 if args.receiver_url else None)
-    page = (_PAGE_TOP.format(n_groups=len(groups), n_photos=n_photos)
+    page = (_PAGE_TOP.format(n_groups=len(groups), n_photos=n_photos,
+                             nav_css=NAV_CSS,
+                             nav=nav_html("fp_review.html",
+                                          f"built {date.today().isoformat()}"))
             + "".join(sections)
             + _PAGE_BOTTOM.replace("__RECEIVER__", json.dumps(receiver)))
     args.output.parent.mkdir(parents=True, exist_ok=True)

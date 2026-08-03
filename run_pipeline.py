@@ -35,7 +35,6 @@ import json
 import sys
 import urllib.request
 from base64 import b64encode
-from datetime import date
 from os import environ
 from pathlib import Path
 
@@ -196,13 +195,16 @@ def main(argv=None) -> None:
         _banner("regenerate the hosted pages")
         import make_review_page
         import make_search_page
+        # Stable filenames: the pages' nav bar links them to each other,
+        # and .htaccess serves HTML no-cache, so the old reason to
+        # date-stamp (stale browser caches) is gone. The built date shows
+        # in each page's header instead.
         review_args = ["--review", str(out / "review_pallets_matched.csv"),
                        "--catalog", str(out / "pallets.csv"),
                        "--matched", str(out / "pallets_matched.csv"),
                        "--photo-types", str(out / "photo_types.csv"),
                        "--master", "reference/master_list.csv",
-                       "--output",
-                       str(kit / f"review_{date.today().isoformat()}.html")]
+                       "--output", str(kit / "review.html")]
         if photo_base:
             review_args += ["--photo-base-url", photo_base]
         if receiver_url and review_token:
@@ -219,9 +221,7 @@ def main(argv=None) -> None:
                        "--matched", str(out / "pallets_final.csv"),
                        "--master", "reference/master_list.csv",
                        "--photo-base-url", photo_base,
-                       "--output",
-                       str(kit /
-                           f"fp_review_{date.today().isoformat()}.html")]
+                       "--output", str(kit / "fp_review.html")]
             if receiver_url and review_token:
                 fp_args += ["--receiver-url", receiver_url,
                             "--receiver-token", review_token]

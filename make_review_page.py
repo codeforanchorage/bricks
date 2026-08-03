@@ -51,10 +51,12 @@ import html
 import io
 import json
 import sys
+from datetime import date
 from pathlib import Path
 from urllib.parse import quote
 
 from hostpaths import derivative_url
+from pagenav import NAV_CSS, nav_html
 
 THUMB_WIDTH = 640      # px; ~40-90 KB/photo -> a few hundred fit in one file
 JPEG_QUALITY = 72
@@ -113,10 +115,11 @@ _PAGE_TOP = """<!DOCTYPE html>
  h2.divider {{ max-width: 1080px; margin: 26px auto 6px; font-size: 15px;
          color: #5a4a1f; background: #f6ecd4; border-radius: 8px;
          padding: 10px 16px; }}
-</style>
+{nav_css}</style>
 </head>
 <body>
 <header>
+ {nav}
  <h1>Town Square brick review &mdash; {n_items} photo(s) need a decision</h1>
  <p>For each photo: click the brick it shows. If none of the choices match,
     pick &ldquo;None of these&rdquo;; if the photo is unreadable, pick
@@ -519,7 +522,10 @@ def main(argv=None) -> None:
 
     receiver = ({"url": args.receiver_url, "token": args.receiver_token}
                 if args.receiver_url else None)
-    page = (_PAGE_TOP.format(thumb=THUMB_WIDTH, n_items=len(ordered))
+    page = (_PAGE_TOP.format(thumb=THUMB_WIDTH, n_items=len(ordered),
+                             nav_css=NAV_CSS,
+                             nav=nav_html("review.html",
+                                          f"built {date.today().isoformat()}"))
             + "".join(sections)
             + _PAGE_BOTTOM.replace("__RECEIVER__", json.dumps(receiver)))
     args.output.parent.mkdir(parents=True, exist_ok=True)

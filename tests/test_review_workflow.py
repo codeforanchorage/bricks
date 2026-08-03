@@ -348,6 +348,50 @@ def test_fp_page_skips_resolved_photos(tmp_path):
     assert 'class="info"' in page
 
 
+def test_pages_nav_bar_links_sibling_pages(tmp_path):
+    # One basic-auth login covers the whole directory; the nav bar lets
+    # staff click between the three pages. Each page marks itself as
+    # you-are-here (no self-link) and links the other two by their
+    # STABLE filenames (pagenav.py is the contract run_pipeline.py obeys).
+    photos = tmp_path / "photos"
+    photos.mkdir()
+    _photo(photos / "worn.jpg")
+    review = tmp_path / "review.csv"
+    _write(review, REVIEW_COLS, [
+        {"image": "worn.jpg", "brick_id": "1", "rank": "1", "score": "0.7",
+         "basis": "text", "official_id": "1", "official_section": "A",
+         "official_name": "X", "official_keyword": "X", "matched_read": "X"}])
+    out = tmp_path / "review.html"
+    make_review_page.main(["--review", str(review), "--photos", str(photos),
+                           "--output", str(out)])
+    page = out.read_text(encoding="utf-8")
+    assert '<a href="search.html">' in page
+    assert '<a href="fp_review.html">' in page
+    assert '<a href="review.html">' not in page
+    assert '<span class="here">Review queue</span>' in page
+
+    fp = tmp_path / "fp.csv"
+    _write(fp, FP_COLS, [
+        {"official_id": "1", "official_section": "A", "official_name": "X",
+         "copies": "1", "image": "worn.jpg", "score": "0.9",
+         "matched_read": "X"}])
+    matched = tmp_path / "matched.csv"
+    _write(matched, MATCH_COLS, [
+        {"image": "worn.jpg", "brick_id": "1", "match_status": "matched",
+         "official_id": "1", "official_section": "A",
+         "official_name": "X", "official_keyword": "X"}])
+    out = tmp_path / "fp.html"
+    import make_fp_page
+    make_fp_page.main(["--fp", str(fp), "--matched", str(matched),
+                       "--photo-base-url", "https://x.test/photos",
+                       "--output", str(out)])
+    page = out.read_text(encoding="utf-8")
+    assert '<a href="search.html">' in page
+    assert '<a href="review.html">' in page
+    assert '<a href="fp_review.html">' not in page
+    assert '<span class="here">Duplicate check</span>' in page
+
+
 def test_review_page_warns_on_missing_photo(tmp_path, capsys):
     photos = tmp_path / "photos"
     photos.mkdir()

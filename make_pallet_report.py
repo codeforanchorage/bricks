@@ -18,9 +18,10 @@ one section but every one carries strays (and 'Pallet H2' is mostly
 section F), so the Section column on each tab is the retrieval truth.
 
 Built for the printed-page use case (a PDF of these tabs posted at each
-pallet): every row carries the Buyer and BOTH brick numbers -- people
-arrive with either the original number (old certificates) or the
-post-2008 one, and buyers are often not who's engraved.
+pallet): every row carries BOTH brick numbers (people arrive with either
+the original number or the post-2008 one), the buyer surname from both
+lists (OG list = OCR'd scan, new list = clean typed Excel), both lists'
+inscriptions, and the photo's own OCR read for comparison.
 
 Usage:
     python make_pallet_report.py --matched output/pallets_final.csv \
@@ -35,9 +36,11 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-HEADERS = ["Pallet", "Section", "Orig #", "New #", "Buyer",
-           "Inscription (official)", "Photo", "Status", "Review note"]
-WIDTHS = [11, 9, 9, 9, 24, 46, 20, 12, 28]
+HEADERS = ["Section", "Pallet", "Orig #", "New #",
+           "Buyer (OG list)", "Buyer (new list)", "Photo OCR read",
+           "Inscription (new list)", "Photo", "Status", "Review note"]
+WIDTHS = [9, 11, 9, 9, 20, 20, 36, 44, 20, 11, 26]
+STATUS_COL = HEADERS.index("Status")
 
 STATUS = {"matched": "Present", "unmatched": "in review",
           "no_match": "unofficial", "stack_photo": "stack shot",
@@ -61,6 +64,10 @@ def main(argv=None) -> None:
     parser.add_argument("--master", required=True, type=Path,
                         help="reference/master_list.csv (buyer + both "
                              "brick numbers)")
+    parser.add_argument("--xls", type=Path,
+                        default=Path("reference/brick_list_xls.csv"),
+                        help="Official Excel list (clean typed buyer "
+                             "key_word per section+new id)")
     parser.add_argument("--output", required=True, type=Path,
                         help=".xlsx workbook to write")
     args = parser.parse_args(argv)
@@ -80,6 +87,15 @@ def main(argv=None) -> None:
         for row in csv.DictReader(f):
             key = (row["section"].upper(), row["new_id"] or row["orig_id"])
             master.setdefault(key, row)  # dup_orig twins: first row speaks
+
+    # The official Excel list's key_word is the clean TYPED buyer name --
+    # the master's buyer column is the OCR'd OG-list surname.
+    xls_buyer: dict[tuple[str, str], str] = {}
+    if args.xls.exists():
+        with open(args.xls, newline="", encoding="utf-8") as f:
+            for row in csv.DictReader(f):
+                key = (row["section"].upper(), row["assigned_id"])
+                xls_buyer.setdefault(key, row.get("key_word", ""))
 
     by_pallet: dict[str, list[dict]] = defaultdict(list)
     with open(args.matched, newline="", encoding="utf-8") as f:
@@ -127,15 +143,18 @@ def main(argv=None) -> None:
                 n_review += 1
             else:
                 n_other += 1
-            m = master.get((row.get("official_section", "").upper(),
-                            row.get("official_id", "")), {})
+            key = (row.get("official_section", "").upper(),
+                   row.get("official_id", ""))
+            m = master.get(key, {})
             values = [
-                pallet,
                 row.get("official_section", ""),
+                pallet,
                 m.get("orig_id", ""),
                 m.get("new_id", ""),
                 m.get("buyer", ""),
-                row.get("official_name", ""),
+                xls_buyer.get(key, ""),
+                row.get("matched_read", ""),
+                m.get("new_inscription", ""),
                 Path(row.get("image", "")).name,
                 status,
                 row.get("review_note", ""),
@@ -165,7 +184,7 @@ def main(argv=None) -> None:
     all_ws.freeze_panes = "A2"
     for _, values in sorted(all_rows, key=lambda pair: _sort_key(pair[0])):
         all_ws.append(values)
-        if values[7] == "Present":
+        if values[STATUS_COL] == "Present":
             for cell in all_ws[all_ws.max_row]:
                 cell.fill = green
     all_ws.auto_filter.ref = (f"A1:{get_column_letter(len(HEADERS))}"
@@ -182,6 +201,10 @@ def main(argv=None) -> None:
     summary.append(["People may arrive with EITHER brick number: Orig # is "
                     "from pre-2008 certificates, New # is the current "
                     "official numbering."])
+    summary.append(["Buyer (OG list) is OCR'd from the scanned original "
+                    "list; Buyer (new list) is the clean typed name from "
+                    "the official Excel. Photo OCR read is what the camera "
+                    "saw on the brick itself."])
     summary.append(["'Distinct bricks' can be below 'Present' when the same "
                     "brick was photographed twice on one pallet; the TOTAL "
                     "row de-duplicates across pallets."])

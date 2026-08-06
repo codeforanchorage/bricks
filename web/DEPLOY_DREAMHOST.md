@@ -42,6 +42,14 @@ hosting (PHP already enabled for WordPress) — no added cost.
    One shared staff login is fine — the receiver token and reviewer names
    do the fine-grained accounting.
 
+   **Pausing the password:** keep two local variants (git-ignored,
+   `web/htaccess_auth_on.local` / `web/htaccess_auth_off.local`) and
+   upload whichever one as `.htaccess` — that's the whole toggle. The
+   "off" variant opens the search page and photos but keeps
+   `review.html`, `fp_review.html` and `receiver.php` behind the login:
+   generated review pages embed the receiver token in their HTML, so a
+   public review page would leak the token to anyone who views source.
+
 4. **Token.** Edit `receiver.php`, set `TOKEN` to a long random string
    (e.g. from `python -c "import secrets; print(secrets.token_urlsafe(32))"`).
    Use the same value when building review pages.

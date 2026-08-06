@@ -16,6 +16,9 @@ derivatives/
 # Deployed receiver copy with the real token (commit only the CHANGE-ME one)
 web/receiver.local.php
 
+# Ready-to-upload .htaccess variants (carry the real server paths)
+web/htaccess_*.local
+
 # Reviewer decision files (carry reviewer names; live data, not source)
 decisions*.csv
 

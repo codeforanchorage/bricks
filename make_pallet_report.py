@@ -15,8 +15,14 @@ Pallet labels are warehouse labels, not sections: most pallets are ~90%
 one section but every one carries strays (and 'Pallet H2' is mostly
 section F), so the Section column on each tab is the retrieval truth.
 
+Built for the printed-page use case (a PDF of these tabs posted at each
+pallet): every row carries the Buyer and BOTH brick numbers -- people
+arrive with either the original number (old certificates) or the
+post-2008 one, and buyers are often not who's engraved.
+
 Usage:
     python make_pallet_report.py --matched output/pallets_final.csv \
+        --master reference/master_list.csv \
         --output output/brick_report_by_pallet.xlsx
 """
 from __future__ import annotations
@@ -27,9 +33,9 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-HEADERS = ["Section", "Brick #", "Inscription (official)", "Photo",
-           "Status", "Section check", "Score", "Reviewer", "Review note"]
-WIDTHS = [9, 9, 46, 22, 12, 13, 7, 14, 30]
+HEADERS = ["Section", "Orig #", "New #", "Buyer", "Inscription (official)",
+           "Photo", "Status", "Review note"]
+WIDTHS = [9, 9, 9, 24, 46, 20, 12, 28]
 
 STATUS = {"matched": "Present", "unmatched": "in review",
           "no_match": "unofficial", "stack_photo": "stack shot",
@@ -50,6 +56,9 @@ def main(argv=None) -> None:
         description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--matched", required=True, type=Path,
                         help="Applied catalogue (output/pallets_final.csv)")
+    parser.add_argument("--master", required=True, type=Path,
+                        help="reference/master_list.csv (buyer + both "
+                             "brick numbers)")
     parser.add_argument("--output", required=True, type=Path,
                         help=".xlsx workbook to write")
     args = parser.parse_args(argv)
@@ -61,6 +70,14 @@ def main(argv=None) -> None:
     except ImportError:
         raise SystemExit("openpyxl is not installed -- run: "
                          "pip install -r requirements.txt")
+
+    # Master rows keyed the way match.py reports a brick: (section, the
+    # id it matched under -- new_id when the brick was renumbered).
+    master: dict[tuple[str, str], dict] = {}
+    with open(args.master, newline="", encoding="utf-8") as f:
+        for row in csv.DictReader(f):
+            key = (row["section"].upper(), row["new_id"] or row["orig_id"])
+            master.setdefault(key, row)  # dup_orig twins: first row speaks
 
     by_pallet: dict[str, list[dict]] = defaultdict(list)
     with open(args.matched, newline="", encoding="utf-8") as f:
@@ -107,16 +124,16 @@ def main(argv=None) -> None:
                 n_review += 1
             else:
                 n_other += 1
+            m = master.get((row.get("official_section", "").upper(),
+                            row.get("official_id", "")), {})
             ws.append([
                 row.get("official_section", ""),
-                row.get("official_id", ""),
+                m.get("orig_id", ""),
+                m.get("new_id", ""),
+                m.get("buyer", ""),
                 row.get("official_name", ""),
                 Path(row.get("image", "")).name,
                 status,
-                "" if row.get("section_check") in ("", "ok", "unassigned")
-                else row.get("section_check", ""),
-                row.get("score", ""),
-                row.get("reviewer", ""),
                 row.get("review_note", ""),
             ])
             if status == "Present":
@@ -139,6 +156,9 @@ def main(argv=None) -> None:
     summary.append(["Pallet labels are warehouse labels, not sections -- "
                     "the Section column on each tab says where the brick "
                     "belongs in the official list."])
+    summary.append(["People may arrive with EITHER brick number: Orig # is "
+                    "from pre-2008 certificates, New # is the current "
+                    "official numbering."])
     summary.append(["'Distinct bricks' can be below 'Present' when the same "
                     "brick was photographed twice on one pallet; the TOTAL "
                     "row de-duplicates across pallets."])

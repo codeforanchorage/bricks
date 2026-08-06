@@ -33,9 +33,9 @@ import sys
 from collections import Counter, defaultdict
 from pathlib import Path
 
-HEADERS = ["Section", "Orig #", "New #", "Buyer", "Inscription (official)",
-           "Photo", "Status", "Review note"]
-WIDTHS = [9, 9, 9, 24, 46, 20, 12, 28]
+HEADERS = ["Pallet", "Section", "Orig #", "New #", "Buyer",
+           "Inscription (official)", "Photo", "Status", "Review note"]
+WIDTHS = [11, 9, 9, 9, 24, 46, 20, 12, 28]
 
 STATUS = {"matched": "Present", "unmatched": "in review",
           "no_match": "unofficial", "stack_photo": "stack shot",
@@ -127,6 +127,7 @@ def main(argv=None) -> None:
             m = master.get((row.get("official_section", "").upper(),
                             row.get("official_id", "")), {})
             ws.append([
+                pallet,
                 row.get("official_section", ""),
                 m.get("orig_id", ""),
                 m.get("new_id", ""),

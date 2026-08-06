@@ -8,6 +8,8 @@ so staff pulling a brick can work from the pallet they are standing at.
 
 Sheets:
   Summary      per-pallet totals and which sections the pallet holds
+  All bricks   every row from every pallet tab in one sheet, sorted by
+               section and brick number -- the search-everything view
   Pallet <X>   one row per PHOTO taken on that pallet, with the brick it
                matched (section, number, inscription) or its review state
 
@@ -99,6 +101,7 @@ def main(argv=None) -> None:
 
     totals = Counter()
     all_keys: set = set()
+    all_rows: list[tuple[dict, list]] = []  # (source row, sheet values)
     for pallet in sorted(by_pallet):
         rows = sorted(by_pallet[pallet], key=_sort_key)
         ws = wb.create_sheet(pallet[:31])
@@ -126,7 +129,7 @@ def main(argv=None) -> None:
                 n_other += 1
             m = master.get((row.get("official_section", "").upper(),
                             row.get("official_id", "")), {})
-            ws.append([
+            values = [
                 pallet,
                 row.get("official_section", ""),
                 m.get("orig_id", ""),
@@ -136,7 +139,9 @@ def main(argv=None) -> None:
                 Path(row.get("image", "")).name,
                 status,
                 row.get("review_note", ""),
-            ])
+            ]
+            ws.append(values)
+            all_rows.append((row, values))
             if status == "Present":
                 for cell in ws[ws.max_row]:
                     cell.fill = green
@@ -148,6 +153,23 @@ def main(argv=None) -> None:
         totals.update({"photos": len(rows), "present": n_present,
                        "review": n_review, "other": n_other})
         all_keys |= keys
+
+    # One searchable sheet with every pallet's rows, ordered by brick
+    # (section then number) so a lookup doesn't need to know the pallet.
+    all_ws = wb.create_sheet("All bricks", 1)
+    all_ws.append(HEADERS)
+    for cell in all_ws[1]:
+        cell.font = bold
+    for i, width in enumerate(WIDTHS, 1):
+        all_ws.column_dimensions[get_column_letter(i)].width = width
+    all_ws.freeze_panes = "A2"
+    for _, values in sorted(all_rows, key=lambda pair: _sort_key(pair[0])):
+        all_ws.append(values)
+        if values[7] == "Present":
+            for cell in all_ws[all_ws.max_row]:
+                cell.fill = green
+    all_ws.auto_filter.ref = (f"A1:{get_column_letter(len(HEADERS))}"
+                              f"{all_ws.max_row}")
 
     summary.append(["TOTAL", totals["photos"], totals["present"],
                     len(all_keys), totals["review"], totals["other"], ""])

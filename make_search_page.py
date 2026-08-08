@@ -26,10 +26,21 @@ arrives. Image URLs are relative (photos/...), so
 they resolve when the page is hosted next to the derivative trees and
 silently hide when offline -- search itself needs no network.
 
+With --public the page is built for visitors instead of front-desk
+staff: no nav bar (the staff pages don't exist where this is hosted),
+no photo/verify UI (no image trees on GitHub Pages -- search is pure
+text), and the help text speaks to a brick buyer, not a reviewer. The
+baked-in data is identical, so the same names and numbers match.
+
 Usage:
     python make_search_page.py --master reference/master_list.csv \
         --matched output/singles_matched.csv \
         --output output/search.html
+
+    # public GitHub Pages variant (no photos, no staff nav)
+    python make_search_page.py --master reference/master_list.csv \
+        --matched output/pallets_final.csv \
+        --public --output docs/index.html
 """
 from __future__ import annotations
 
@@ -59,7 +70,7 @@ _PAGE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Town Square bricks &mdash; pickup counter search</title>
+<title>__PAGETITLE__</title>
 <style>
  body { font-family: system-ui, sans-serif; margin: 0; background: #f4f2ee;
         color: #1d2733; }
@@ -115,57 +126,18 @@ __NAVCSS__</style>
 <body>
 <header>
  __NAV__
- <h1>Town Square bricks &mdash; pickup counter search</h1>
+ <h1>__PAGETITLE__</h1>
  <div class="stamp">__STAMP__</div>
 </header>
 <div id="wrap">
 <input id="q" placeholder="Type a name, words from the brick, or a brick number&hellip;" autofocus autocomplete="off">
 <div id="meta"></div>
-<details>
- <summary>Front desk &mdash; how to use this page</summary>
- <ol>
-  <li><b>Ask for the name on the brick</b> (or words they remember from it),
-      or the number from their certificate. Type it above &mdash; spelling
-      does not have to be exact, and names spelled by sound (BRIAN/BRYAN,
-      CATHY/KATHY) still match.</li>
-  <li><b>Numbers:</b> the same number can exist twice &mdash; bricks moved in
-      the 2008 renovation were given NEW numbers, so every numeric hit says
-      which numbering it is. Certificates show the <i>original</i> number.</li>
-  <li><b>Read the visitor the result:</b> the section letter is where the
-      brick was in the park. An <span class="chip photo">at pickup site</span>
-      chip means the brick was photographed at the pickup location &mdash; it
-      made the move from Town Square and is on that pallet. No chip only
-      means it has not been photographed yet, NOT that it is lost.</li>
-  <li><b>Status meanings:</b>
-      <span class="chip ok">on the list</span> the brick is in the official
-      records; <span class="chip warn">needs verification</span> the two
-      official lists disagree about this row &mdash; take the visitor's name
-      and contact info for follow-up, do not promise the brick;
-      <span class="chip gray">no brick made</span> the purchase is recorded
-      but no brick was ever engraved.</li>
-  <li><b>Checking a match before pickup:</b> the
-      <span class="chip photo">at pickup site</span> bricks have a
-      <b>verify &#128247;</b> button &mdash; it opens the warehouse photo,
-      what the computer read from it, and the brick&rsquo;s row in the
-      scanned official list. If the photo doesn&rsquo;t say what the list
-      row says, the match may be wrong: note it for follow-up rather than
-      promising the brick.</li>
-  <li><b>&ldquo;Unofficial&rdquo; results</b> are bricks a reviewer
-      confirmed exist at the pickup site but are missing from the official
-      lists &mdash; they show what the brick reads and which pallet holds
-      it. The photo is the record; the visitor can still claim it.</li>
-  <li><b>Not found at all?</b> Try fewer words, or just the surname. If it
-      is genuinely absent, take contact info and add it to the follow-up
-      list &mdash; absence here is not final until every pallet is
-      photographed.</li>
-  <li><b>Every claimant</b> must also complete the Municipality&rsquo;s
-      attestation form before taking a brick.</li>
- </ol>
-</details>
+__HELP__
 <div id="out"></div>
 </div>
 <script>
 "use strict";
+const SHOW_PHOTOS = __SHOWPHOTOS__;  // false on the public no-photo build
 const DATA = __DATA__;          // [orig,new,section,moved,status,buyer,og,newi,flag,extra]
 const PHOTOS = __PHOTOS__;      // "SECTION|id" -> [pallet,image,extra,read,note]
 const UNOFFICIAL = __UNOFFICIAL__;  // [image,pallet,read,note] no_match photos
@@ -280,8 +252,8 @@ function card(row, idx) {
            "not in official records</span>" +
            '<span class="chip photo">at pickup site' +
            (pallet ? " &mdash; pallet " + esc(pallet) : "") + "</span>" +
-           ' <button class="verify" onclick="togglePanel(this,' + idx +
-           ')">verify &#128247;</button></div>' +
+           (SHOW_PHOTOS ? ' <button class="verify" onclick="togglePanel(this,' +
+            idx + ')">verify &#128247;</button>' : "") + "</div>" +
            '<div class="sub">Confirmed by a reviewer as present but ' +
            "absent from the lists" +
            (note ? " &middot; note: " + esc(note) : "") + "</div></div>";
@@ -294,8 +266,8 @@ function card(row, idx) {
   const buyer = r[5] ? "Buyer: " + esc(r[5]) + " &middot; " : "";
   // Staff verification: photographed bricks expand to photo + OCR read +
   // scanned list row, to catch a false-positive match by eye.
-  const verify = p ? ' <button class="verify" onclick="togglePanel(this,' +
-      idx + ')">verify &#128247;</button>' : "";
+  const verify = (SHOW_PHOTOS && p) ? ' <button class="verify" ' +
+      'onclick="togglePanel(this,' + idx + ')">verify &#128247;</button>' : "";
   return '<div class="card" data-idx="' + idx + '">' +
          '<div class="insc">' + esc(insc) + "</div>" +
          '<div class="sub">' + chips(r) + verify + "</div>" +
@@ -432,6 +404,80 @@ document.addEventListener("keydown", e => {
 </html>
 """
 
+_HELP_STAFF = r"""<details>
+ <summary>Front desk &mdash; how to use this page</summary>
+ <ol>
+  <li><b>Ask for the name on the brick</b> (or words they remember from it),
+      or the number from their certificate. Type it above &mdash; spelling
+      does not have to be exact, and names spelled by sound (BRIAN/BRYAN,
+      CATHY/KATHY) still match.</li>
+  <li><b>Numbers:</b> the same number can exist twice &mdash; bricks moved in
+      the 2008 renovation were given NEW numbers, so every numeric hit says
+      which numbering it is. Certificates show the <i>original</i> number.</li>
+  <li><b>Read the visitor the result:</b> the section letter is where the
+      brick was in the park. An <span class="chip photo">at pickup site</span>
+      chip means the brick was photographed at the pickup location &mdash; it
+      made the move from Town Square and is on that pallet. No chip only
+      means it has not been photographed yet, NOT that it is lost.</li>
+  <li><b>Status meanings:</b>
+      <span class="chip ok">on the list</span> the brick is in the official
+      records; <span class="chip warn">needs verification</span> the two
+      official lists disagree about this row &mdash; take the visitor's name
+      and contact info for follow-up, do not promise the brick;
+      <span class="chip gray">no brick made</span> the purchase is recorded
+      but no brick was ever engraved.</li>
+  <li><b>Checking a match before pickup:</b> the
+      <span class="chip photo">at pickup site</span> bricks have a
+      <b>verify &#128247;</b> button &mdash; it opens the warehouse photo,
+      what the computer read from it, and the brick&rsquo;s row in the
+      scanned official list. If the photo doesn&rsquo;t say what the list
+      row says, the match may be wrong: note it for follow-up rather than
+      promising the brick.</li>
+  <li><b>&ldquo;Unofficial&rdquo; results</b> are bricks a reviewer
+      confirmed exist at the pickup site but are missing from the official
+      lists &mdash; they show what the brick reads and which pallet holds
+      it. The photo is the record; the visitor can still claim it.</li>
+  <li><b>Not found at all?</b> Try fewer words, or just the surname. If it
+      is genuinely absent, take contact info and add it to the follow-up
+      list &mdash; absence here is not final until every pallet is
+      photographed.</li>
+  <li><b>Every claimant</b> must also complete the Municipality&rsquo;s
+      attestation form before taking a brick.</li>
+ </ol>
+</details>"""
+
+_HELP_PUBLIC = r"""<details>
+ <summary>About this search</summary>
+ <ol>
+  <li><b>Type the name on the brick</b>, words you remember from its
+      inscription, or the brick number from your certificate &mdash;
+      spelling does not have to be exact, and names spelled by sound
+      (BRIAN/BRYAN, CATHY/KATHY) still match.</li>
+  <li><b>Numbers:</b> the same number can exist twice &mdash; bricks moved in
+      the 2008 renovation were given NEW numbers, so every numeric hit says
+      which numbering it is. Certificates show the <i>original</i> number.</li>
+  <li>The section letter is where the brick was in Town Square. An
+      <span class="chip photo">at pickup site</span> chip means the brick
+      was photographed at the pickup location &mdash; it made the move and
+      is on that pallet. No chip only means it has not been photographed
+      yet, NOT that it is lost.</li>
+  <li><b>Status meanings:</b>
+      <span class="chip ok">on the list</span> the brick is in the official
+      records; <span class="chip warn">needs verification</span> the two
+      official lists disagree about this row &mdash; staff will follow up
+      before pickup; <span class="chip gray">no brick made</span> the
+      purchase is recorded but no brick was ever engraved.</li>
+  <li><b>&ldquo;Unofficial&rdquo; results</b> are bricks confirmed to exist
+      at the pickup site but missing from the official lists &mdash; they
+      show what the brick reads and which pallet holds it. They can still
+      be claimed.</li>
+  <li><b>Not found at all?</b> Try fewer words, or just the surname &mdash;
+      absence here is not final until every pallet is photographed.</li>
+  <li><b>To claim a brick</b>, contact Anchorage Parks &amp; Recreation and
+      complete the Municipality&rsquo;s attestation form at pickup.</li>
+ </ol>
+</details>"""
+
 
 def _load_master(path: Path) -> list[list[str]]:
     rows = []
@@ -505,6 +551,10 @@ def main(argv=None) -> None:
     parser.add_argument("--matched", type=Path, nargs="*", default=[],
                         help="matched CSV(s) from match.py -- adds "
                              "photographed-on-pallet status per brick")
+    parser.add_argument("--public", action="store_true",
+                        help="visitor-facing build: no staff nav, no "
+                             "photo/verify UI, public help text (for "
+                             "GitHub Pages)")
     parser.add_argument("--output", required=True, type=Path,
                         help="Self-contained .html file to write")
     args = parser.parse_args(argv)
@@ -519,9 +569,14 @@ def main(argv=None) -> None:
              + (f" · {len(unofficial)} unofficial" if unofficial else "")
              + " · works offline")
 
+    title = ("Town Square bricks &mdash; brick search" if args.public
+             else "Town Square bricks &mdash; pickup counter search")
     page = (_PAGE
-            .replace("__NAVCSS__", NAV_CSS)
-            .replace("__NAV__", nav_html("search.html"))
+            .replace("__NAVCSS__", "" if args.public else NAV_CSS)
+            .replace("__NAV__", "" if args.public else nav_html("search.html"))
+            .replace("__PAGETITLE__", title)
+            .replace("__HELP__", _HELP_PUBLIC if args.public else _HELP_STAFF)
+            .replace("__SHOWPHOTOS__", "false" if args.public else "true")
             .replace("__STAMP__", stamp)
             .replace("__DATA__", _json(rows))
             .replace("__PHOTOS__", _json(photos))
@@ -534,9 +589,13 @@ def main(argv=None) -> None:
     size_mb = args.output.stat().st_size / 1e6
     print(f"Wrote {args.output}  ({len(rows):,} bricks, "
           f"{len(photos):,} with photos, {size_mb:.1f} MB)")
-    print("Hosting note: keep the stable filenames (search.html, "
-          "review.html, fp_review.html) -- the nav bar links them, and "
-          "the .htaccess serves HTML no-cache so they never go stale.")
+    if args.public:
+        print("Public build: no nav, no photo/verify UI -- safe to host "
+              "anywhere static (GitHub Pages: commit as docs/index.html).")
+    else:
+        print("Hosting note: keep the stable filenames (search.html, "
+              "review.html, fp_review.html) -- the nav bar links them, and "
+              "the .htaccess serves HTML no-cache so they never go stale.")
 
 
 if __name__ == "__main__":

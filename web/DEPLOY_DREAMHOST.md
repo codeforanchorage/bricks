@@ -131,3 +131,25 @@ Security note: the repo is public. The real receiver token lives ONLY in
 the uploaded receiver.php and in generated review pages on the protected
 subdomain — never in git (output/ and web/receiver.local.php are
 git-ignored).
+
+## Public search page on GitHub Pages
+
+A visitor-facing, no-login copy of the search page lives at
+`docs/index.html` and is served by GitHub Pages
+(https://codeforanchorage.github.io/bricks/). It is built with
+`--public`: no nav bar (the staff pages don't exist there), no
+photo/verify UI (pure text search — the derivative trees stay on
+Dreamhost), and help text written for brick buyers. No token, no server
+paths — safe to publish.
+
+```powershell
+python make_search_page.py --master reference/master_list.csv `
+    --matched output/pallets_final.csv `
+    --public --output docs/index.html
+```
+
+Refreshing it is build-then-commit: Pages redeploys on push
+(`output/` is git-ignored, so the built page must be committed in
+`docs/`). To add photos later, point the page's `PHOTO_BASE` at the
+public Dreamhost photo trees (absolute URL) instead of baking images
+into the repo — derivatives are far too big for git.

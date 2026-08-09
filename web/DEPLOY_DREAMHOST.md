@@ -136,20 +136,26 @@ git-ignored).
 
 A visitor-facing, no-login copy of the search page lives at
 `docs/index.html` and is served by GitHub Pages
-(https://codeforanchorage.github.io/bricks/). It is built with
-`--public`: no nav bar (the staff pages don't exist there), no
-photo/verify UI (pure text search — the derivative trees stay on
-Dreamhost), and help text written for brick buyers. No token, no server
-paths — safe to publish.
+(https://codeforanchorage.org/bricks/ — the org's custom domain; the
+github.io URL redirects there). It is built with `--public`: no nav bar
+(the staff pages don't exist there) and help text written for brick
+buyers. No token, no server paths — safe to publish.
+
+Photos are NOT in the repo (derivatives are far too big for git):
+`--photo-base-url` makes the page hotlink the Dreamhost trees, which
+requires the `/bricks/photos/` path to be publicly reachable (the
+auth-off `.htaccess` variant opens it). Omit the flag for a pure
+text-search build with no photo UI at all.
 
 ```powershell
 python make_search_page.py --master reference/master_list.csv `
     --matched output/pallets_final.csv `
-    --public --output docs/index.html
+    --public --photo-base-url https://brendanbabb.com/bricks/photos `
+    --output docs/index.html
 ```
 
 Refreshing it is build-then-commit: Pages redeploys on push
 (`output/` is git-ignored, so the built page must be committed in
-`docs/`). To add photos later, point the page's `PHOTO_BASE` at the
-public Dreamhost photo trees (absolute URL) instead of baking images
-into the repo — derivatives are far too big for git.
+`docs/`). If the Dreamhost password is ever turned back on for the
+photo trees, rebuild without `--photo-base-url` so the public page
+doesn't show broken images.

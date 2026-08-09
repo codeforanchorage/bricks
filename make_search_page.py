@@ -27,20 +27,23 @@ they resolve when the page is hosted next to the derivative trees and
 silently hide when offline -- search itself needs no network.
 
 With --public the page is built for visitors instead of front-desk
-staff: no nav bar (the staff pages don't exist where this is hosted),
-no photo/verify UI (no image trees on GitHub Pages -- search is pure
-text), and the help text speaks to a brick buyer, not a reviewer. The
-baked-in data is identical, so the same names and numbers match.
+staff: no nav bar (the staff pages don't exist where this is hosted)
+and the help text speaks to a brick buyer, not a reviewer. The baked-in
+data is identical, so the same names and numbers match. Photo/verify UI
+appears only when --photo-base-url points at hosted derivative trees
+(GitHub Pages carries no images -- they hotlink from Dreamhost);
+without it the public page is pure text search.
 
 Usage:
     python make_search_page.py --master reference/master_list.csv \
         --matched output/singles_matched.csv \
         --output output/search.html
 
-    # public GitHub Pages variant (no photos, no staff nav)
+    # public GitHub Pages variant (photos hotlinked from Dreamhost)
     python make_search_page.py --master reference/master_list.csv \
         --matched output/pallets_final.csv \
-        --public --output docs/index.html
+        --public --photo-base-url https://brendanbabb.com/bricks/photos \
+        --output docs/index.html
 """
 from __future__ import annotations
 
@@ -241,7 +244,9 @@ function idLine(r) {
          (moved === "no" ? " (original number, never renumbered)" : "");
 }
 
-const PHOTO_BASE = "photos";   // relative: works hosted, hides offline
+const PHOTO_BASE = "__PHOTOBASE__";  // relative default: works hosted next
+                                     // to the trees, hides offline; absolute
+                                     // on GitHub Pages (Dreamhost hotlinks)
 
 function card(row, idx) {
   if (row.u) {
@@ -286,7 +291,8 @@ function togglePanel(button, idx) {
     const rel = encodeURI(hit.u[0]).replace(/'/g, "%27");
     panel.innerHTML =
       '<img class="photo" loading="lazy" src="' + PHOTO_BASE + '/thumbs/' +
-      rel + '" onclick="magnifyPhoto(\'' + rel + '\')">' +
+      rel + '" onclick="magnifyPhoto(\'' + rel + '\')" ' +
+      'onerror="this.style.display=\'none\'">' +
       '<div class="cap">Photo (click to zoom) &middot; ' +
       "no official list row exists for this brick</div>";
     cardEl.appendChild(panel);
@@ -466,7 +472,7 @@ _HELP_PUBLIC = r"""<details>
       records; <span class="chip warn">needs verification</span> the two
       official lists disagree about this row &mdash; staff will follow up
       before pickup; <span class="chip gray">no brick made</span> the
-      purchase is recorded but no brick was ever engraved.</li>
+      purchase is recorded but no brick was ever engraved.</li>__PUBVERIFY__
   <li><b>&ldquo;Unofficial&rdquo; results</b> are bricks confirmed to exist
       at the pickup site but missing from the official lists &mdash; they
       show what the brick reads and which pallet holds it. They can still
@@ -477,6 +483,15 @@ _HELP_PUBLIC = r"""<details>
       complete the Municipality&rsquo;s attestation form at pickup.</li>
  </ol>
 </details>"""
+
+# Inserted into the public help only when the build carries photo links.
+_PUBVERIFY = r"""
+  <li><b>See the brick:</b> <span class="chip photo">at pickup site</span>
+      bricks have a <b>verify &#128247;</b> button &mdash; it opens the
+      warehouse photo of the brick (click it to zoom), what the computer
+      read from it, and the brick&rsquo;s row in the scanned official
+      list. If a photo doesn&rsquo;t load, the record text still
+      stands.</li>"""
 
 
 def _load_master(path: Path) -> list[list[str]]:
@@ -552,9 +567,14 @@ def main(argv=None) -> None:
                         help="matched CSV(s) from match.py -- adds "
                              "photographed-on-pallet status per brick")
     parser.add_argument("--public", action="store_true",
-                        help="visitor-facing build: no staff nav, no "
-                             "photo/verify UI, public help text (for "
-                             "GitHub Pages)")
+                        help="visitor-facing build: no staff nav, public "
+                             "help text, photos only if --photo-base-url "
+                             "is given (for GitHub Pages)")
+    parser.add_argument("--photo-base-url", default="",
+                        help="absolute URL of the hosted photo trees "
+                             "(thumbs/zoom/strips), e.g. "
+                             "https://example.com/bricks/photos -- "
+                             "default is the relative 'photos' dir")
     parser.add_argument("--output", required=True, type=Path,
                         help="Self-contained .html file to write")
     args = parser.parse_args(argv)
@@ -571,12 +591,20 @@ def main(argv=None) -> None:
 
     title = ("Town Square bricks &mdash; brick search" if args.public
              else "Town Square bricks &mdash; pickup counter search")
+    photo_base = args.photo_base_url.rstrip("/") or "photos"
+    # Public builds show photo UI only when pointed at a hosted tree --
+    # a relative path would 404 on GitHub Pages (no images in the repo).
+    show_photos = bool(args.photo_base_url) if args.public else True
+    help_html = (_HELP_PUBLIC.replace(
+                     "__PUBVERIFY__", _PUBVERIFY if show_photos else "")
+                 if args.public else _HELP_STAFF)
     page = (_PAGE
             .replace("__NAVCSS__", "" if args.public else NAV_CSS)
             .replace("__NAV__", "" if args.public else nav_html("search.html"))
             .replace("__PAGETITLE__", title)
-            .replace("__HELP__", _HELP_PUBLIC if args.public else _HELP_STAFF)
-            .replace("__SHOWPHOTOS__", "false" if args.public else "true")
+            .replace("__HELP__", help_html)
+            .replace("__SHOWPHOTOS__", "true" if show_photos else "false")
+            .replace("__PHOTOBASE__", photo_base)
             .replace("__STAMP__", stamp)
             .replace("__DATA__", _json(rows))
             .replace("__PHOTOS__", _json(photos))
@@ -590,8 +618,10 @@ def main(argv=None) -> None:
     print(f"Wrote {args.output}  ({len(rows):,} bricks, "
           f"{len(photos):,} with photos, {size_mb:.1f} MB)")
     if args.public:
-        print("Public build: no nav, no photo/verify UI -- safe to host "
-              "anywhere static (GitHub Pages: commit as docs/index.html).")
+        print("Public build: no staff nav; photos "
+              + (f"hotlinked from {photo_base}" if show_photos
+                 else "OFF (no --photo-base-url)")
+              + " (GitHub Pages: commit as docs/index.html).")
     else:
         print("Hosting note: keep the stable filenames (search.html, "
               "review.html, fp_review.html) -- the nav bar links them, and "

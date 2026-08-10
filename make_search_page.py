@@ -423,8 +423,12 @@ _HELP_STAFF = r"""<details>
   <li><b>Read the visitor the result:</b> the section letter is where the
       brick was in the park. An <span class="chip photo">at pickup site</span>
       chip means the brick was photographed at the pickup location &mdash; it
-      made the move from Town Square and is on that pallet. No chip only
-      means it has not been photographed yet, NOT that it is lost.</li>
+      made the move from Town Square and is on that pallet. Every pallet
+      has now been photographed, so no chip means the brick was NOT
+      identified in the photos &mdash; but some photos are still in human
+      review, and identical copies of the same inscription are hard to
+      tell apart, so treat it as &ldquo;not yet located&rdquo;, not
+      lost.</li>
   <li><b>Status meanings:</b>
       <span class="chip ok">on the list</span> the brick is in the official
       records; <span class="chip warn">needs verification</span> the two
@@ -445,8 +449,8 @@ _HELP_STAFF = r"""<details>
       it. The photo is the record; the visitor can still claim it.</li>
   <li><b>Not found at all?</b> Try fewer words, or just the surname. If it
       is genuinely absent, take contact info and add it to the follow-up
-      list &mdash; absence here is not final until every pallet is
-      photographed.</li>
+      list &mdash; photos are still being reviewed, so absence today is
+      strong evidence but not the final word.</li>
   <li><b>Every claimant</b> must also complete the Municipality&rsquo;s
       attestation form before taking a brick.</li>
  </ol>
@@ -465,8 +469,11 @@ _HELP_PUBLIC = r"""<details>
   <li>The section letter is where the brick was in Town Square. An
       <span class="chip photo">at pickup site</span> chip means the brick
       was photographed at the pickup location &mdash; it made the move and
-      is on that pallet. No chip only means it has not been photographed
-      yet, NOT that it is lost.</li>
+      is on that pallet. Every pallet has been photographed, so a brick
+      without the chip was not identified in the photos &mdash; but some
+      photos are still being reviewed, and identical copies of the same
+      inscription are hard to tell apart, so think &ldquo;not yet
+      located&rdquo;, not lost.</li>
   <li><b>Status meanings:</b>
       <span class="chip ok">on the list</span> the brick is in the official
       records; <span class="chip warn">needs verification</span> the two
@@ -477,8 +484,10 @@ _HELP_PUBLIC = r"""<details>
       at the pickup site but missing from the official lists &mdash; they
       show what the brick reads and which pallet holds it. They can still
       be claimed.</li>
-  <li><b>Not found at all?</b> Try fewer words, or just the surname &mdash;
-      absence here is not final until every pallet is photographed.</li>
+  <li><b>Not found at all?</b> Try fewer words, or just the surname. If it
+      still doesn&rsquo;t appear, contact Parks &amp; Recreation &mdash;
+      photos are still being reviewed, so absence here is not the final
+      word.</li>
   <li><b>To claim a brick</b>, contact Anchorage Parks &amp; Recreation and
       complete the Municipality&rsquo;s attestation form at pickup.</li>
  </ol>

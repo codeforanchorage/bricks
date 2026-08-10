@@ -9,10 +9,14 @@ so staff pulling a brick can work from the pallet they are standing at.
 Sheets:
   Summary      per-pallet totals and which sections the pallet holds
   All bricks   every row from every pallet tab in one sheet, sorted by
-               section and brick number -- the search-everything view
-  Pallet <X>   one row per PHOTO taken on that pallet in brick-number
-               order, with the brick it matched (section, number,
-               inscription) or its review state
+               ORIGINAL brick number -- the search-everything view
+  Pallet <X>   one row per PHOTO taken on that pallet in original-
+               brick-number order, with the brick it matched (section,
+               number, inscription) or its review state
+
+Sorting is numeric on the original number (certificates carry it;
+leading zeros like 0021 sort as 21), falling back to the new number
+when a row has no original one.
 
 Every row leads with the Section and Pallet cells highlighted in the
 search page's badge colours (navy section, gold pallet).
@@ -51,19 +55,21 @@ STATUS = {"matched": "Present", "unmatched": "in review",
           "illegible": "illegible"}
 
 
-def _sort_key(row: dict) -> tuple:
-    sec = row.get("official_section", "") or "~"  # blanks sort last
-    ident = (row.get("official_id", "") or "").replace(",", "")
-    return (sec, int(ident) if ident.isdigit() else 10**9,
-            row.get("image", ""))
+ORIG_COL = HEADERS.index("Orig #")
+NEW_COL = HEADERS.index("New #")
+PHOTO_COL = HEADERS.index("Photo")
 
 
-def _number_key(row: dict) -> tuple:
-    # Pallet tabs sort by brick number alone: people arrive with a
-    # number, and one pallet mixes sections anyway.
-    ident = (row.get("official_id", "") or "").replace(",", "")
-    return (int(ident) if ident.isdigit() else 10**9,
-            row.get("official_section", "") or "~", row.get("image", ""))
+def _orig_key(values: list) -> tuple:
+    # Sort by ORIGINAL brick number -- certificates carry it. Leading
+    # zeros are display-only: 0021 sorts as 21. Rows with no original
+    # number fall back to the new number; number-less rows (in-review
+    # photos, unofficial bricks) sort last, by photo name.
+    for ident in (values[ORIG_COL], values[NEW_COL]):
+        digits = str(ident or "").replace(",", "").strip()
+        if digits.isdigit():
+            return (0, int(digits), values[PHOTO_COL])
+    return (1, 10**9, values[PHOTO_COL])
 
 
 def main(argv=None) -> None:
@@ -141,9 +147,9 @@ def main(argv=None) -> None:
 
     totals = Counter()
     all_keys: set = set()
-    all_rows: list[tuple[dict, list]] = []  # (source row, sheet values)
+    all_rows: list[list] = []  # every tab's sheet values
     for pallet in sorted(by_pallet):
-        rows = sorted(by_pallet[pallet], key=_number_key)
+        rows = by_pallet[pallet]
         ws = wb.create_sheet(pallet[:31])
         ws.append(HEADERS)
         for cell in ws[1]:
@@ -155,6 +161,7 @@ def main(argv=None) -> None:
         sections = Counter()
         keys = set()
         n_present = n_review = n_other = 0
+        prepared: list[list] = []
         for row in rows:
             status = STATUS.get(row.get("match_status", ""),
                                 row.get("match_status", ""))
@@ -170,7 +177,7 @@ def main(argv=None) -> None:
             key = (row.get("official_section", "").upper(),
                    row.get("official_id", ""))
             m = master.get(key, {})
-            values = [
+            prepared.append([
                 row.get("official_section", ""),
                 pallet,
                 m.get("orig_id", ""),
@@ -182,10 +189,12 @@ def main(argv=None) -> None:
                 Path(row.get("image", "")).name,
                 status,
                 row.get("review_note", ""),
-            ]
+            ])
+        prepared.sort(key=_orig_key)
+        for values in prepared:
             ws.append(values)
-            all_rows.append((row, values))
-            if status == "Present":
+            all_rows.append(values)
+            if values[STATUS_COL] == "Present":
                 for cell in ws[ws.max_row]:
                     cell.fill = green
             _paint(ws)
@@ -198,8 +207,8 @@ def main(argv=None) -> None:
                        "review": n_review, "other": n_other})
         all_keys |= keys
 
-    # One searchable sheet with every pallet's rows, ordered by brick
-    # (section then number) so a lookup doesn't need to know the pallet.
+    # One searchable sheet with every pallet's rows, in original-number
+    # order so a lookup doesn't need to know the pallet.
     all_ws = wb.create_sheet("All bricks", 1)
     all_ws.append(HEADERS)
     for cell in all_ws[1]:
@@ -207,7 +216,7 @@ def main(argv=None) -> None:
     for i, width in enumerate(WIDTHS, 1):
         all_ws.column_dimensions[get_column_letter(i)].width = width
     all_ws.freeze_panes = "A2"
-    for _, values in sorted(all_rows, key=lambda pair: _sort_key(pair[0])):
+    for values in sorted(all_rows, key=_orig_key):
         all_ws.append(values)
         if values[STATUS_COL] == "Present":
             for cell in all_ws[all_ws.max_row]:

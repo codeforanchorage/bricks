@@ -90,6 +90,11 @@ _PAGE = r"""<!DOCTYPE html>
  details li { margin: 6px 0; }
  .card { background: #fff; border-radius: 8px; padding: 12px 16px;
          margin: 10px 0; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+ .loc { margin-bottom: 6px; }
+ .badge { display: inline-block; border-radius: 6px; padding: 3px 12px;
+          font-size: 15px; font-weight: 700; margin-right: 8px; }
+ .badge.sec { background: #274156; color: #fff; }
+ .badge.pal { background: #ffd966; color: #4a3a00; }
  .insc { font-size: 18px; font-weight: 600; }
  .sub { color: #555; font-size: 14px; margin-top: 4px; }
  .chip { display: inline-block; border-radius: 12px; padding: 2px 10px;
@@ -229,9 +234,19 @@ function chips(r) {
   else if (status === "no_brick") h += '<span class="chip gray">no brick made</span>';
   else h += '<span class="chip warn">needs verification</span>';
   const p = PHOTOS[key];
-  if (p) h += '<span class="chip photo">at pickup site &mdash; pallet ' +
-              esc(p[0] || "?") + '</span>';
+  if (p) h += '<span class="chip photo">at pickup site</span>';
   return h;
+}
+
+// Section (official list) + the folder the photo came from (the pallet
+// it is stacked on) -- the two facts a searcher acts on, so they lead
+// the card as badges instead of hiding in the detail line.
+function locBadges(sec, pallet) {
+  let h = "";
+  if (sec) h += '<span class="badge sec">Section ' +
+                esc(sec.toUpperCase()) + "</span>";
+  if (pallet) h += '<span class="badge pal">' + esc(pallet) + "</span>";
+  return h ? '<div class="loc">' + h + "</div>" : "";
 }
 
 function idLine(r) {
@@ -252,11 +267,11 @@ function card(row, idx) {
   if (row.u) {
     const [img, pallet, read, note] = row.u;
     return '<div class="card" data-idx="' + idx + '">' +
+           locBadges("", pallet) +
            '<div class="insc">' + esc(read || "(unreadable)") + "</div>" +
            '<div class="sub"><span class="chip warn">unofficial &mdash; ' +
            "not in official records</span>" +
-           '<span class="chip photo">at pickup site' +
-           (pallet ? " &mdash; pallet " + esc(pallet) : "") + "</span>" +
+           '<span class="chip photo">at pickup site</span>' +
            (SHOW_PHOTOS ? ' <button class="verify" onclick="togglePanel(this,' +
             idx + ')">verify &#128247;</button>' : "") + "</div>" +
            '<div class="sub">Confirmed by a reviewer as present but ' +
@@ -274,6 +289,7 @@ function card(row, idx) {
   const verify = (SHOW_PHOTOS && p) ? ' <button class="verify" ' +
       'onclick="togglePanel(this,' + idx + ')">verify &#128247;</button>' : "";
   return '<div class="card" data-idx="' + idx + '">' +
+         locBadges(r[2], p ? p[0] : "") +
          '<div class="insc">' + esc(insc) + "</div>" +
          '<div class="sub">' + chips(r) + verify + "</div>" +
          '<div class="sub">' + buyer + idLine(r) + "</div></div>";
@@ -420,15 +436,18 @@ _HELP_STAFF = r"""<details>
   <li><b>Numbers:</b> the same number can exist twice &mdash; bricks moved in
       the 2008 renovation were given NEW numbers, so every numeric hit says
       which numbering it is. Certificates show the <i>original</i> number.</li>
-  <li><b>Read the visitor the result:</b> the section letter is where the
-      brick was in the park. An <span class="chip photo">at pickup site</span>
-      chip means the brick was photographed at the pickup location &mdash; it
-      made the move from Town Square and is on that pallet. Every pallet
-      has now been photographed, so no chip means the brick was NOT
-      identified in the photos &mdash; but some photos are still in human
-      review, and identical copies of the same inscription are hard to
-      tell apart, so treat it as &ldquo;not yet located&rdquo;, not
-      lost.</li>
+  <li><b>Read the visitor the result:</b> the dark
+      <span class="badge sec">Section</span> badge is where the brick was
+      in the park (the official list's section); the gold
+      <span class="badge pal">Pallet</span> badge is the folder its photo
+      came from &mdash; the pallet it is stacked on at the pickup site.
+      An <span class="chip photo">at pickup site</span> chip means the
+      brick was photographed there &mdash; it made the move from Town
+      Square. Every pallet has now been photographed, so no chip means
+      the brick was NOT identified in the photos &mdash; but some photos
+      are still in human review, and identical copies of the same
+      inscription are hard to tell apart, so treat it as &ldquo;not yet
+      located&rdquo;, not lost.</li>
   <li><b>Status meanings:</b>
       <span class="chip ok">on the list</span> the brick is in the official
       records; <span class="chip warn">needs verification</span> the two
@@ -474,14 +493,16 @@ _HELP_PUBLIC = r"""<details>
   <li><b>Numbers:</b> the same number can exist twice &mdash; bricks moved in
       the 2008 renovation were given NEW numbers, so every numeric hit says
       which numbering it is. Certificates show the <i>original</i> number.</li>
-  <li>The section letter is where the brick was in Town Square. An
+  <li>The dark <span class="badge sec">Section</span> badge shows where
+      the brick was in Town Square; the gold
+      <span class="badge pal">Pallet</span> badge is the pallet it is
+      stacked on at the pickup site &mdash; that is where to look. An
       <span class="chip photo">at pickup site</span> chip means the brick
-      was photographed at the pickup location &mdash; it made the move and
-      is on that pallet. Every pallet has been photographed, so a brick
-      without the chip was not identified in the photos &mdash; but some
-      photos are still being reviewed, and identical copies of the same
-      inscription are hard to tell apart, so think &ldquo;not yet
-      located&rdquo;, not lost.</li>
+      was photographed there &mdash; it made the move. Every pallet has
+      been photographed, so a brick without the chip was not identified
+      in the photos &mdash; but some photos are still being reviewed, and
+      identical copies of the same inscription are hard to tell apart, so
+      think &ldquo;not yet located&rdquo;, not lost.</li>
   <li><b>Status meanings:</b>
       <span class="chip ok">on the list</span> the brick is in the official
       records; <span class="chip warn">needs verification</span> the two

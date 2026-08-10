@@ -444,8 +444,9 @@ _HELP_STAFF = r"""<details>
       An <span class="chip photo">at pickup site</span> chip means the
       brick was photographed there &mdash; it made the move from Town
       Square. Every pallet has now been photographed, so no chip means
-      the brick was NOT identified in the photos &mdash; but some photos
-      are still in human review, and identical copies of the same
+      the brick was NOT identified in the photos &mdash; but some bricks
+      were too worn to read, some photos matched no list row, some are
+      still in human review, and identical copies of the same
       inscription are hard to tell apart, so treat it as &ldquo;not yet
       located&rdquo;, not lost.</li>
   <li><b>Status meanings:</b>
@@ -484,7 +485,20 @@ _HELP_STAFF = r"""<details>
 </details>"""
 
 _HELP_PUBLIC = r"""<details>
- <summary>About this search</summary>
+ <summary>About this search &mdash; a Code for Anchorage volunteer
+ project</summary>
+ <p><b>This is a volunteer project of
+ <a href="https://codeforanchorage.org/">Code for Anchorage</a></b>
+ &mdash; an extra tool to help you find your brick, alongside the
+ Municipality&rsquo;s official
+ <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">pickup
+ process</a>. Parks &amp; Recreation employees photographed every
+ pallet at the pickup site, and volunteers computer-matched the photos
+ to the official brick lists. It is not
+ an official Municipality record: some bricks were not readable in
+ their photos and some photos matched no list row, so a brick that does
+ not appear as found here may still be at the pickup site. Sadly, some
+ bricks also did not survive the move.</p>
  <ol>
   <li><b>Type the name on the brick</b>, words you remember from its
       inscription, or the brick number from your certificate &mdash;
@@ -497,12 +511,15 @@ _HELP_PUBLIC = r"""<details>
       the brick was in Town Square; the gold
       <span class="badge pal">Pallet</span> badge is the pallet it is
       stacked on at the pickup site &mdash; that is where to look. An
-      <span class="chip photo">at pickup site</span> chip means the brick
-      was photographed there &mdash; it made the move. Every pallet has
-      been photographed, so a brick without the chip was not identified
-      in the photos &mdash; but some photos are still being reviewed, and
-      identical copies of the same inscription are hard to tell apart, so
-      think &ldquo;not yet located&rdquo;, not lost.</li>
+      <span class="chip photo">at pickup site</span> chip means the
+      brick was photographed there &mdash; it made the move.</li>
+  <li><b>No chip does NOT mean your brick is gone.</b> Every pallet was
+      photographed, but some bricks were too worn to read in their
+      photo, some photos could not be matched to a row in the lists,
+      some photos are still being reviewed, and identical copies of the
+      same inscription are hard to tell apart &mdash; your brick may
+      well still be on a pallet. Sadly, some bricks also did not
+      survive the move.</li>
   <li><b>Status meanings:</b>
       <span class="chip ok">on the list</span> the brick is in the official
       records; <span class="chip warn">needs verification</span> the two
@@ -513,11 +530,12 @@ _HELP_PUBLIC = r"""<details>
       at the pickup site but missing from the official lists &mdash; they
       show what the brick reads and which pallet holds it. They can still
       be claimed.</li>
-  <li><b>Not found at all?</b> Try fewer words, or just the surname. The
-      Municipality notes a small portion of bricks did not reach the
-      pickup site due to breakage or loss, and photos are still being
-      reviewed &mdash; so absence here is strong evidence but not the
-      final word. Ask at the pickup site or email the address below.</li>
+  <li><b>Not found at all?</b> Try fewer words, or just the surname. If
+      it still doesn&rsquo;t appear, it may be a brick this project
+      could not read or match &mdash; or one of the small portion the
+      Municipality says did not survive the move. Coming to look in
+      person is still worthwhile; you can also email the address
+      below.</li>
   <li><b>To claim your brick:</b> pickup is in person (or by a designated
       representative) at <b>2839 Mountain View Dr</b> &mdash; generally
       Mondays &amp; Thursdays 10&nbsp;AM&ndash;2&nbsp;PM and Saturdays
@@ -638,11 +656,12 @@ def main(argv=None) -> None:
     photos, unofficial = _load_photos(args.matched)
 
     scan_map = {chr(k): v for k, v in _CONFUSABLE.items()}
-    stamp = (f"Built {date.today().isoformat()} · {len(rows):,} bricks"
+    stamp = (("A Code for Anchorage volunteer project · " if args.public
+              else "")
+             + f"Built {date.today().isoformat()} · {len(rows):,} bricks"
              + (f" · {len(photos):,} confirmed at pickup site" if photos
                 else "")
-             + (f" · {len(unofficial)} unofficial" if unofficial else "")
-             + " · works offline")
+             + (f" · {len(unofficial)} unofficial" if unofficial else ""))
 
     title = ("Town Square bricks &mdash; brick search" if args.public
              else "Town Square bricks &mdash; pickup counter search")

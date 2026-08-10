@@ -10,8 +10,12 @@ Sheets:
   Summary      per-pallet totals and which sections the pallet holds
   All bricks   every row from every pallet tab in one sheet, sorted by
                section and brick number -- the search-everything view
-  Pallet <X>   one row per PHOTO taken on that pallet, with the brick it
-               matched (section, number, inscription) or its review state
+  Pallet <X>   one row per PHOTO taken on that pallet in brick-number
+               order, with the brick it matched (section, number,
+               inscription) or its review state
+
+Every row leads with the Section and Pallet cells highlighted in the
+search page's badge colours (navy section, gold pallet).
 
 Pallet labels are warehouse labels, not sections: most pallets are ~90%
 one section but every one carries strays (and 'Pallet H2' is mostly
@@ -52,6 +56,14 @@ def _sort_key(row: dict) -> tuple:
     ident = (row.get("official_id", "") or "").replace(",", "")
     return (sec, int(ident) if ident.isdigit() else 10**9,
             row.get("image", ""))
+
+
+def _number_key(row: dict) -> tuple:
+    # Pallet tabs sort by brick number alone: people arrive with a
+    # number, and one pallet mixes sections anyway.
+    ident = (row.get("official_id", "") or "").replace(",", "")
+    return (int(ident) if ident.isdigit() else 10**9,
+            row.get("official_section", "") or "~", row.get("image", ""))
 
 
 def main(argv=None) -> None:
@@ -105,6 +117,18 @@ def main(argv=None) -> None:
     wb = Workbook()
     bold = Font(bold=True)
     green = PatternFill("solid", start_color="D8EFD0")
+    # Section and Pallet lead every row highlighted in the search page's
+    # badge colours: navy = the brick's official section, gold = the
+    # pallet its photo came from.
+    sec_fill = PatternFill("solid", start_color="274156")
+    sec_font = Font(bold=True, color="FFFFFF")
+    pal_fill = PatternFill("solid", start_color="FFD966")
+    pal_font = Font(bold=True, color="4A3A00")
+
+    def _paint(ws) -> None:
+        cell_sec, cell_pal = ws[ws.max_row][0], ws[ws.max_row][1]
+        cell_sec.fill, cell_sec.font = sec_fill, sec_font
+        cell_pal.fill, cell_pal.font = pal_fill, pal_font
 
     summary = wb.active
     summary.title = "Summary"
@@ -119,7 +143,7 @@ def main(argv=None) -> None:
     all_keys: set = set()
     all_rows: list[tuple[dict, list]] = []  # (source row, sheet values)
     for pallet in sorted(by_pallet):
-        rows = sorted(by_pallet[pallet], key=_sort_key)
+        rows = sorted(by_pallet[pallet], key=_number_key)
         ws = wb.create_sheet(pallet[:31])
         ws.append(HEADERS)
         for cell in ws[1]:
@@ -164,6 +188,7 @@ def main(argv=None) -> None:
             if status == "Present":
                 for cell in ws[ws.max_row]:
                     cell.fill = green
+            _paint(ws)
         ws.auto_filter.ref = f"A1:{get_column_letter(len(HEADERS))}{ws.max_row}"
 
         section_note = ", ".join(f"{s}: {n}" for s, n in sections.most_common())
@@ -187,6 +212,7 @@ def main(argv=None) -> None:
         if values[STATUS_COL] == "Present":
             for cell in all_ws[all_ws.max_row]:
                 cell.fill = green
+        _paint(all_ws)
     all_ws.auto_filter.ref = (f"A1:{get_column_letter(len(HEADERS))}"
                               f"{all_ws.max_row}")
 

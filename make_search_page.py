@@ -451,8 +451,16 @@ _HELP_STAFF = r"""<details>
       is genuinely absent, take contact info and add it to the follow-up
       list &mdash; photos are still being reviewed, so absence today is
       strong evidence but not the final word.</li>
-  <li><b>Every claimant</b> must also complete the Municipality&rsquo;s
-      attestation form before taking a brick.</li>
+  <li><b>Every claimant</b> (or their designated representative) must
+      also complete the Municipality&rsquo;s
+      <a href="https://forms.office.com/Pages/ResponsePage.aspx?id=y3h6EsUZykaxH4fDPEmpB6XezpspokpJu5-tBv5K8IBUQTEwUFBLME9WSkxSUTcwR0ZIVFk2V1JYNS4u">attestation
+      form</a> (online, no printing) before taking a brick. In-person
+      pickup only, no shipping. Pickup runs through
+      <b>October&nbsp;10, 2026</b> &mdash; generally Mon &amp; Thu
+      10&ndash;2, Sat 10&ndash;12 (exact dates on the
+      <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">official
+      page</a>); after that, bricks are no longer individually
+      tracked.</li>
  </ol>
 </details>"""
 
@@ -484,12 +492,29 @@ _HELP_PUBLIC = r"""<details>
       at the pickup site but missing from the official lists &mdash; they
       show what the brick reads and which pallet holds it. They can still
       be claimed.</li>
-  <li><b>Not found at all?</b> Try fewer words, or just the surname. If it
-      still doesn&rsquo;t appear, contact Parks &amp; Recreation &mdash;
-      photos are still being reviewed, so absence here is not the final
-      word.</li>
-  <li><b>To claim a brick</b>, contact Anchorage Parks &amp; Recreation and
-      complete the Municipality&rsquo;s attestation form at pickup.</li>
+  <li><b>Not found at all?</b> Try fewer words, or just the surname. The
+      Municipality notes a small portion of bricks did not reach the
+      pickup site due to breakage or loss, and photos are still being
+      reviewed &mdash; so absence here is strong evidence but not the
+      final word. Ask at the pickup site or email the address below.</li>
+  <li><b>To claim your brick:</b> pickup is in person (or by a designated
+      representative) at <b>2839 Mountain View Dr</b> &mdash; generally
+      Mondays &amp; Thursdays 10&nbsp;AM&ndash;2&nbsp;PM and Saturdays
+      10&nbsp;AM&ndash;12&nbsp;PM through <b>October&nbsp;10, 2026</b>
+      (exact dates on the
+      <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">official
+      pickup page</a>). Shipping is not available. It is a hands-on,
+      come-find-your-brick experience &mdash; the pallet named in the
+      search result is where to start looking. Parking is limited;
+      carpooling is encouraged.</li>
+  <li><b>Every claimant</b> (or their representative) completes the
+      Municipality&rsquo;s
+      <a href="https://forms.office.com/Pages/ResponsePage.aspx?id=y3h6EsUZykaxH4fDPEmpB6XezpspokpJu5-tBv5K8IBUQTEwUFBLME9WSkxSUTcwR0ZIVFk2V1JYNS4u">online
+      attestation form</a> (no printing needed). Questions:
+      <a href="mailto:parkvolunteers@anchorageak.gov">parkvolunteers@anchorageak.gov</a>.</li>
+  <li><b>After October 10, 2026</b> bricks are no longer individually
+      tracked &mdash; unclaimed bricks may be repurposed or donated to
+      historical organizations.</li>
  </ol>
 </details>"""
 

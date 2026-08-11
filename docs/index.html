@@ -428,6 +428,16 @@ function searchText(q) {
         // sound-alike folds (which cap lower) can't outrank the word
         // the visitor is still finishing.
         if (s < 0.97 && rw.startsWith(qw)) s = 0.97;
+        // And a NEAR-prefix keeps close spellings on screen while the
+        // word is unfinished: score against the same-length window of
+        // the candidate ("mcdonn" vs MCCONNELL's "mcconn"), slightly
+        // discounted. Without this, one divergent letter mid-word made
+        // the whole list collapse to 0 and pop back later (tester
+        // report: mcdon -> 7 hits, mcdonn -> 0, mcdonnel -> 22).
+        if (s < 0.95 && qw.length >= 4 && rw.length > qw.length) {
+          const ps = ratio(qw, rw.slice(0, qw.length)) * 0.95;
+          if (ps > s) s = ps;
+        }
         if (s > best) { best = s; if (best === 1) break; }
       }
       weighted += qw.length * best;

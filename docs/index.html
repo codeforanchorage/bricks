@@ -22,13 +22,18 @@
          margin: 10px 0; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
  .loc { margin-bottom: 6px; }
  .badge { display: inline-block; border-radius: 6px; padding: 3px 12px;
-          font-size: 15px; font-weight: 700; margin-right: 8px; }
+          font-size: 15px; font-weight: 700; margin: 0 8px 4px 0; }
  .badge.sec { background: #274156; color: #fff; }
  .badge.pal { background: #ffd966; color: #4a3a00; }
+ /* Section/pallet letters render in a serif face: sans-serif I is a
+    bare bar, unreadable next to 1 and l (sections run A-K, and pallet
+    I exists). Serifs give I its crossbars. */
+ .lt { font-family: Georgia, "Times New Roman", serif; font-size: 108%;
+       letter-spacing: .5px; }
  .insc { font-size: 18px; font-weight: 600; }
  .sub { color: #555; font-size: 14px; margin-top: 4px; }
  .chip { display: inline-block; border-radius: 12px; padding: 2px 10px;
-         font-size: 12.5px; font-weight: 600; margin-right: 6px; }
+         font-size: 12.5px; font-weight: 600; margin: 2px 6px 2px 0; }
  .ok    { background: #e2f0d9; color: #2d5a1b; }
  .warn  { background: #fdeeca; color: #7a5a00; }
  .gray  { background: #e8e8e8; color: #555; }
@@ -37,9 +42,9 @@
  .orignum { background: #fdf0c2; border-radius: 4px; padding: 1px 5px;
             font-weight: 600; }
  mark { background: #ffe9a8; padding: 0 1px; }
- button.verify { margin-left: 6px; padding: 1px 10px; font-size: 12.5px;
-        border: 1px solid #bcd; border-radius: 12px; background: #eef5fa;
-        cursor: pointer; color: #1b4a5a; }
+ button.verify { margin: 2px 6px 2px 0; padding: 4px 12px; font-size: 13px;
+        border: 1px solid #bcd; border-radius: 14px; background: #eef5fa;
+        cursor: pointer; color: #1b4a5a; touch-action: manipulation; }
  .panel { margin-top: 10px; border-top: 1px solid #eee; padding-top: 8px; }
  .panel img.photo { max-width: 640px; width: 100%; border-radius: 6px;
         display: block; }
@@ -61,6 +66,19 @@
  #zoomstrip img.wide { width: 97vw; max-width: none; }
  #zoomstrip img.fit { max-width: 97vw; max-height: 94vh;
         object-fit: contain; }
+ /* Phones: tighter frame, larger tap targets. The search input stays
+    >=16px so iOS doesn't zoom the page on focus. */
+ @media (max-width: 600px) {
+   header { padding: 10px 14px; }
+   header h1 { font-size: 17px; }
+   #wrap { padding: 10px 10px 40px; }
+   #q { font-size: 18px; padding: 10px 12px; margin-top: 10px; }
+   .card { padding: 10px 12px; }
+   .insc { font-size: 16.5px; }
+   .badge { font-size: 14px; padding: 3px 10px; }
+   button.verify { padding: 8px 14px; font-size: 14px; }
+   .panel .cap { font-size: 13.5px; }
+ }
 </style>
 </head>
 <body>
@@ -264,18 +282,20 @@ function chips(r) {
 // the card as badges instead of hiding in the detail line.
 function locBadges(sec, pallet) {
   let h = "";
-  if (sec) h += '<span class="badge sec">Park section ' +
-                esc(sec.toUpperCase()) + "</span>";
+  if (sec) h += '<span class="badge sec">Park section <span class="lt">' +
+                esc(sec.toUpperCase()) + "</span></span>";
   // Folder names already start with the word Pallet ("Pallet H3").
   if (pallet) h += '<span class="badge pal">Pickup pallet ' +
+                   '<span class="lt">' +
                    esc(String(pallet).replace(/^pallet\s+/i, "")) +
-                   "</span>";
+                   "</span></span>";
   return h ? '<div class="loc">' + h + "</div>" : "";
 }
 
 function idLine(r) {
   const [orig, newid, sec, moved] = [r[0], r[1], r[2], r[3]];
-  const s = sec ? "Section " + esc(sec.toUpperCase()) : "section unknown";
+  const s = sec ? 'Section <span class="lt">' + esc(sec.toUpperCase()) +
+                  "</span>" : "section unknown";
   // The original number is what people look up on the PAPER lists at
   // the pickup site (sorted by it) -- so it gets a subtle highlight.
   if (newid && newid !== orig)

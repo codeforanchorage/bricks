@@ -34,6 +34,8 @@
  .gray  { background: #e8e8e8; color: #555; }
  .photo { background: #d9e8f0; color: #1b4a5a; }
  .ids { font-family: ui-monospace, Consolas, monospace; }
+ .orignum { background: #fdf0c2; border-radius: 4px; padding: 1px 5px;
+            font-weight: 600; }
  mark { background: #ffe9a8; padding: 0 1px; }
  button.verify { margin-left: 6px; padding: 1px 10px; font-size: 12.5px;
         border: 1px solid #bcd; border-radius: 12px; background: #eef5fa;
@@ -92,7 +94,10 @@
       (BRIAN/BRYAN, CATHY/KATHY) still match.</li>
   <li><b>Numbers:</b> the same number can exist twice &mdash; bricks moved in
       the 2008 renovation were given NEW numbers, so every numeric hit says
-      which numbering it is. Certificates show the <i>original</i> number.</li>
+      which numbering it is. Certificates show the <i>original</i> number
+      &mdash; it is <span class="orignum">highlighted</span> on each
+      result, and it is the number to look up on the paper lists at the
+      pickup site (they are sorted by it).</li>
   <li>The dark <span class="badge sec">Park section</span> badge shows
       where the brick was in Town Square; the gold
       <span class="badge pal">Pickup pallet</span> badge is the pallet it
@@ -263,10 +268,14 @@ function locBadges(sec, pallet) {
 function idLine(r) {
   const [orig, newid, sec, moved] = [r[0], r[1], r[2], r[3]];
   const s = sec ? "Section " + esc(sec.toUpperCase()) : "section unknown";
+  // The original number is what people look up on the PAPER lists at
+  // the pickup site (sorted by it) -- so it gets a subtle highlight.
   if (newid && newid !== orig)
-    return s + ' &middot; <span class="ids">original #' + esc(orig) +
+    return s + ' &middot; <span class="ids"><span class="orignum">' +
+           "original #" + esc(orig) + "</span>" +
            " &rarr; now #" + esc(newid) + "</span> (moved in 2008)";
-  return s + ' &middot; <span class="ids">#' + esc(orig) + "</span>" +
+  return s + ' &middot; <span class="ids"><span class="orignum">#' +
+         esc(orig) + "</span></span>" +
          (moved === "no" ? " (original number, never renumbered)" : "");
 }
 

@@ -555,9 +555,11 @@ _HELP_PUBLIC = r"""<details>
       <span class="chip ok">in the official records</span> the brick is on
       the official brick lists;
       <span class="chip warn">needs verification</span> the two
-      official lists disagree about this row &mdash; staff will follow up
-      before pickup; <span class="chip gray">no brick made</span> the
-      purchase is recorded but no brick was ever engraved.</li>__PUBVERIFY__
+      official lists disagree about this row;
+      <span class="chip gray">no brick made</span> the official list
+      itself marks this sale &ldquo;no brick / no inscription&rdquo;
+      &mdash; the purchase is recorded but no brick was ever
+      engraved.</li>__PUBVERIFY__
   <li><b>&ldquo;Unofficial&rdquo; results</b> are bricks confirmed to exist
       at the pickup site but missing from the official lists &mdash; they
       show what the brick reads and which pallet holds it. They can still

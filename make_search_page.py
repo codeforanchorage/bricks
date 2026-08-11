@@ -404,7 +404,12 @@ function searchText(q) {
     for (const qw of qwords) {
       let best = 0;
       for (const rw of row.words) {
-        const s = wsim(qw, rw);
+        let s = wsim(qw, rw);
+        // Mid-typing, the word being typed is a PREFIX of its target
+        // ("larso" -> LARSON). Rank true prefixes just under exact so
+        // sound-alike folds (which cap lower) can't outrank the word
+        // the visitor is still finishing.
+        if (s < 0.97 && rw.startsWith(qw)) s = 0.97;
         if (s > best) { best = s; if (best === 1) break; }
       }
       weighted += qw.length * best;

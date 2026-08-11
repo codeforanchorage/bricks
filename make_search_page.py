@@ -22,9 +22,10 @@ Photographed bricks get a click-to-expand VERIFICATION panel: the brick
 photo (thumbnail; clicking overlays the 2500px zoom image, fetched only
 then), the OCR read, and the scanned list-row image (click to magnify)
 -- so staff can catch a false-positive match by eye before a claimant
-arrives. Image URLs are relative (photos/...), so
-they resolve when the page is hosted next to the derivative trees and
-silently hide when offline -- search itself needs no network.
+arrives. Image URLs default to relative (photos/...), resolving when
+the page is hosted next to the derivative trees and silently hiding
+when offline; --photo-base-url swaps in an absolute host (the GitHub
+Pages build hotlinks Dreamhost). Search itself needs no network.
 
 With --public the page is built for visitors instead of front-desk
 staff: no nav bar (the staff pages don't exist where this is hosted)

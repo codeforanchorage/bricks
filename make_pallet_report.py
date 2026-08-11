@@ -28,8 +28,8 @@ section F), so the Section column on each tab is the retrieval truth.
 Built for the printed-page use case (a PDF of these tabs posted at each
 pallet): every row carries BOTH brick numbers (people arrive with either
 the original number or the post-2008 one), the buyer surname from both
-lists (OG list = OCR'd scan, new list = clean typed Excel), both lists'
-inscriptions, and the photo's own OCR read for comparison.
+lists (OG list = OCR'd scan, new list = clean typed Excel), the new
+list's inscription, and the photo's own OCR read for comparison.
 
 Usage:
     python make_pallet_report.py --matched output/pallets_final.csv \

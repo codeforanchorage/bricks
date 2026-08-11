@@ -460,12 +460,15 @@ _HELP_STAFF = r"""<details>
       pickup site.
       An <span class="chip photo">at pickup site</span> chip means the
       brick was photographed there &mdash; it made the move from Town
-      Square. Every pallet has now been photographed, so no chip means
-      the brick was NOT identified in the photos &mdash; but some bricks
-      were too worn to read, some photos matched no list row, some are
-      still in human review, and identical copies of the same
-      inscription are hard to tell apart, so treat it as &ldquo;not yet
-      located&rdquo;, not lost.</li>
+      Square. Every pallet has now been photographed, so
+      <span class="chip ok">in the official records</span> with NO
+      pickup-site chip means the brick is real but was not identified
+      in the photos &mdash; some bricks were too worn to read, some
+      photos matched no list row, some are still in human review, and
+      identical copies of the same inscription are hard to tell apart.
+      Treat it as &ldquo;not yet located&rdquo;, not lost: bricks from
+      one section mostly traveled together, so send the visitor to the
+      pallets holding that section.</li>
   <li><b>Status meanings:</b>
       <span class="chip ok">in the official records</span> the brick is on
       the official brick lists;
@@ -535,13 +538,19 @@ _HELP_PUBLIC = r"""<details>
       is stacked on at the pickup site &mdash; that is where to look. An
       <span class="chip photo">at pickup site</span> chip means the
       brick was photographed there &mdash; it made the move.</li>
-  <li><b>No chip does NOT mean your brick is gone.</b> Every pallet was
-      photographed, but some bricks were too worn to read in their
-      photo, some photos could not be matched to a row in the lists,
-      some photos are still being reviewed, and identical copies of the
-      same inscription are hard to tell apart &mdash; your brick may
-      well still be on a pallet. Sadly, some bricks also did not
-      survive the move.</li>
+  <li><b>Only <span class="chip ok">in the official records</span>, no
+      <span class="chip photo">at pickup site</span> chip?</b> The brick
+      is real &mdash; there is an official record of it &mdash; but the
+      photo matching never identified it at the pickup site. That does
+      NOT mean it is gone: every pallet was photographed, but some
+      bricks were too worn to read in their photo, some photos could
+      not be matched to a row in the lists, some photos are still being
+      reviewed, and identical copies of the same inscription are hard
+      to tell apart &mdash; your brick may well still be on a pallet.
+      It is worth looking in person: bricks from one park section
+      mostly traveled together, so check the pallets holding your
+      section (staff can point them out). Sadly, some bricks also did
+      not survive the move.</li>
   <li><b>Status meanings:</b>
       <span class="chip ok">in the official records</span> the brick is on
       the official brick lists;

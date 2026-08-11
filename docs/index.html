@@ -93,10 +93,10 @@
   <li><b>Numbers:</b> the same number can exist twice &mdash; bricks moved in
       the 2008 renovation were given NEW numbers, so every numeric hit says
       which numbering it is. Certificates show the <i>original</i> number.</li>
-  <li>The dark <span class="badge sec">Section</span> badge shows where
-      the brick was in Town Square; the gold
-      <span class="badge pal">Pallet</span> badge is the pallet it is
-      stacked on at the pickup site &mdash; that is where to look. An
+  <li>The dark <span class="badge sec">Park section</span> badge shows
+      where the brick was in Town Square; the gold
+      <span class="badge pal">Pickup pallet</span> badge is the pallet it
+      is stacked on at the pickup site &mdash; that is where to look. An
       <span class="chip photo">at pickup site</span> chip means the
       brick was photographed there &mdash; it made the move.</li>
   <li><b>No chip does NOT mean your brick is gone.</b> Every pallet was
@@ -107,17 +107,18 @@
       well still be on a pallet. Sadly, some bricks also did not
       survive the move.</li>
   <li><b>Status meanings:</b>
-      <span class="chip ok">on the list</span> the brick is in the official
-      records; <span class="chip warn">needs verification</span> the two
+      <span class="chip ok">in the official records</span> the brick is on
+      the official brick lists;
+      <span class="chip warn">needs verification</span> the two
       official lists disagree about this row &mdash; staff will follow up
       before pickup; <span class="chip gray">no brick made</span> the
       purchase is recorded but no brick was ever engraved.</li>
   <li><b>See the brick:</b> <span class="chip photo">at pickup site</span>
-      bricks have a <b>verify &#128247;</b> button &mdash; it opens the
-      warehouse photo of the brick (click it to zoom), what the computer
-      read from it, and the brick&rsquo;s row in the scanned official
-      list. If a photo doesn&rsquo;t load, the record text still
-      stands.</li>
+      bricks have a <b>show me a picture of the brick &#128247;</b>
+      button &mdash; it opens the warehouse photo (click the photo to
+      enlarge it), what the computer read from it, and the brick&rsquo;s
+      row in the scanned official list. If a photo doesn&rsquo;t load,
+      the record text still stands.</li>
   <li><b>&ldquo;Unofficial&rdquo; results</b> are bricks confirmed to exist
       at the pickup site but missing from the official lists &mdash; they
       show what the brick reads and which pallet holds it. They can still
@@ -237,7 +238,7 @@ function esc(s) {
 function chips(r) {
   const status = r[4], sec = r[2], key = sec.toUpperCase() + "|" + (r[1] || r[0]);
   let h = "";
-  if (status === "ok") h += '<span class="chip ok">on the list</span>';
+  if (status === "ok") h += '<span class="chip ok">in the official records</span>';
   else if (status === "no_brick") h += '<span class="chip gray">no brick made</span>';
   else h += '<span class="chip warn">needs verification</span>';
   const p = PHOTOS[key];
@@ -250,9 +251,12 @@ function chips(r) {
 // the card as badges instead of hiding in the detail line.
 function locBadges(sec, pallet) {
   let h = "";
-  if (sec) h += '<span class="badge sec">Section ' +
+  if (sec) h += '<span class="badge sec">Park section ' +
                 esc(sec.toUpperCase()) + "</span>";
-  if (pallet) h += '<span class="badge pal">' + esc(pallet) + "</span>";
+  // Folder names already start with the word Pallet ("Pallet H3").
+  if (pallet) h += '<span class="badge pal">Pickup pallet ' +
+                   esc(String(pallet).replace(/^pallet\s+/i, "")) +
+                   "</span>";
   return h ? '<div class="loc">' + h + "</div>" : "";
 }
 
@@ -280,7 +284,8 @@ function card(row, idx) {
            "not in official records</span>" +
            '<span class="chip photo">at pickup site</span>' +
            (SHOW_PHOTOS ? ' <button class="verify" onclick="togglePanel(this,' +
-            idx + ')">verify &#128247;</button>' : "") + "</div>" +
+            idx + ')">show me a picture of the brick &#128247;</button>'
+            : "") + "</div>" +
            '<div class="sub">Confirmed by a reviewer as present but ' +
            "absent from the lists" +
            (note ? " &middot; note: " + esc(note) : "") + "</div></div>";
@@ -294,7 +299,8 @@ function card(row, idx) {
   // Staff verification: photographed bricks expand to photo + OCR read +
   // scanned list row, to catch a false-positive match by eye.
   const verify = (SHOW_PHOTOS && p) ? ' <button class="verify" ' +
-      'onclick="togglePanel(this,' + idx + ')">verify &#128247;</button>' : "";
+      'onclick="togglePanel(this,' + idx + ')">show me a picture of the ' +
+      'brick &#128247;</button>' : "";
   return '<div class="card" data-idx="' + idx + '">' +
          locBadges(r[2], p ? p[0] : "") +
          '<div class="insc">' + esc(insc) + "</div>" +
@@ -316,8 +322,8 @@ function togglePanel(button, idx) {
       '<img class="photo" loading="lazy" src="' + PHOTO_BASE + '/thumbs/' +
       rel + '" onclick="magnifyPhoto(\'' + rel + '\')" ' +
       'onerror="this.style.display=\'none\'">' +
-      '<div class="cap">Photo (click to zoom) &middot; ' +
-      "no official list row exists for this brick</div>";
+      '<div class="cap">&#128269; <b>Click the photo to enlarge it</b> ' +
+      "&middot; no official list row exists for this brick</div>";
     cardEl.appendChild(panel);
     return;
   }
@@ -329,15 +335,16 @@ function togglePanel(button, idx) {
     h += '<img class="photo" loading="lazy" src="' + PHOTO_BASE +
          '/thumbs/' + rel + '" onclick="magnifyPhoto(\'' + rel + '\')" ' +
          'onerror="this.style.display=\'none\'">' +
-         '<div class="cap">Photo (click to zoom) &middot; OCR read: ' +
+         '<div class="cap">&#128269; <b>Click the photo to enlarge it</b> ' +
+         '&middot; what the computer read: ' +
          esc(p[3] || "&mdash;") + "</div>";
   }
   h += '<img class="striprow" loading="lazy" src="' + PHOTO_BASE +
        '/strips/' + encodeURIComponent(r[0]) + '.jpg" ' +
        'onclick="magnifyStrip(this)" ' +
        'onerror="this.style.display=\'none\'">' +
-       '<div class="cap">Row in the scanned official list ' +
-       "(click to magnify)</div>";
+       '<div class="cap">&#128269; <b>Click to magnify</b> &middot; the ' +
+       "brick&rsquo;s row in the scanned official list</div>";
   panel.innerHTML = h;
   cardEl.appendChild(panel);
 }

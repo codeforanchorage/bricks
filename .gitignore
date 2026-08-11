@@ -22,6 +22,10 @@ web/htaccess_*.local
 # Reviewer decision files (carry reviewer names; live data, not source)
 decisions*.csv
 
+# Tester feedback screenshots (contain names / private messages)
+searching*.png
+feedback*.png
+
 # Generated output: CSVs, crops, annotated images
 output/
 

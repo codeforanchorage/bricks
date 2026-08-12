@@ -691,8 +691,7 @@ _HELP_PUBLIC = r"""<details>
       <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">official
       Commemorative Brick Return page</a>; if you still have questions,
       email
-      <a href="mailto:parkvolunteers@anchorageak.gov">parkvolunteers@anchorageak.gov</a>
-      - they run the pickup.</li>
+      <a href="mailto:parkvolunteers@anchorageak.gov">parkvolunteers@anchorageak.gov</a>.</li>
  </ul>
  <p class="buildnote">__BUILDNOTE__</p>
 </details>"""

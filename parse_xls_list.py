@@ -89,7 +89,7 @@ def main(argv=None) -> None:
     for sheet in workbook.sheets():
         section = sheet.name.strip().upper()
         if sheet.nrows < 2:
-            print(f"  {section}: empty (area not moved in 2008)")
+            print(f"  {section}: empty (area not moved in 2009)")
             continue
         mapping = _map_headers([sheet.cell_value(0, c)
                                 for c in range(sheet.ncols)])

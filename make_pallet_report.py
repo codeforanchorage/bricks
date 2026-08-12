@@ -27,7 +27,7 @@ section F), so the Section column on each tab is the retrieval truth.
 
 Built for the printed-page use case (a PDF of these tabs posted at each
 pallet): every row carries BOTH brick numbers (people arrive with either
-the original number or the post-2008 one), the buyer surname from both
+the original number or the post-2009 one), the buyer surname from both
 lists (OG list = OCR'd scan, new list = clean typed Excel), the new
 list's inscription, and the photo's own OCR read for comparison.
 
@@ -234,7 +234,7 @@ def main(argv=None) -> None:
                     "the Section column on each tab says where the brick "
                     "belongs in the official list."])
     summary.append(["People may arrive with EITHER brick number: Orig # is "
-                    "from pre-2008 certificates, New # is the current "
+                    "from pre-2009 certificates, New # is the current "
                     "official numbering."])
     summary.append(["Buyer (OG list) is OCR'd from the scanned original "
                     "list; Buyer (new list) is the clean typed name from "

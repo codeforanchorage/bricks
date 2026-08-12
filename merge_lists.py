@@ -9,12 +9,12 @@ questions: does my brick exist, what is its current number, and which section
     (certificate) number, buyer surname. No sections. The v2 build carries a
     second transcription per row (alt_name); the plain tsp_brick_list.csv
     parse also works.
-  * brick_list_xls.csv    -- the post-2008 "new brick numbers" list: relocated
+  * brick_list_xls.csv    -- the post-2009 "new brick numbers" list: relocated
     bricks only (areas A-D, H-K), new number + section. No buyer names.
     (brick_list.csv, the older PDF parse, also works but lost 407 rows.)
 
 The 2009 "How to Find Your Brick" brochure supplies the bridge: bricks in
-areas E, F and G were NOT moved in 2008, and their original numbers are the
+areas E, F and G were NOT moved in 2009, and their original numbers are the
 contiguous ranges below -- so for those, the original number alone gives the
 section. Every other brick was renumbered, and its new number/section must be
 found by matching inscription text (the numbers are unrelated across lists;
@@ -61,7 +61,7 @@ from pathlib import Path
 
 from consensus import _match_key, _normalise, _similar, scan_fold
 
-# Original-number ranges of the areas that did NOT move in the 2008
+# Original-number ranges of the areas that did NOT move in the 2009
 # renovation (2009 brochure / muni.org). For these, orig number = new number.
 UNMOVED_RANGES = {"F": (1, 3377), "G": (8279, 9126), "E": (9127, 10070)}
 

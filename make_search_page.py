@@ -13,7 +13,7 @@ they cannot drift: scan-confusable folding (I/L/T/1/J ...), phonetic
 folding (people SAY names at the counter and parts of the list were
 voice-transcribed: BRIAN/BRYAN, CATHY/KATHY), boilerplate-word dropping,
 and per-word similarity scoring. A numeric query searches BOTH numbering
-eras -- original certificate numbers and 2008 renumbers collide, so all
+eras -- original certificate numbers and 2009 renumbers collide, so all
 hits are shown with their era spelled out.
 
 With --matched (one or more matched CSVs from match.py), each brick also
@@ -294,7 +294,7 @@ function idLine(r) {
   if (newid && newid !== orig)
     return s + ' &middot; <span class="ids"><span class="orignum">' +
            "original #" + esc(orig) + "</span>" +
-           " &rarr; now #" + esc(newid) + "</span> (moved in 2008)";
+           " &rarr; now #" + esc(newid) + "</span> (moved in 2009)";
   return s + ' &middot; <span class="ids"><span class="orignum">#' +
          esc(orig) + "</span></span>" +
          (moved === "no" ? " (original number, never renumbered)" : "");
@@ -321,7 +321,7 @@ function card(row, idx) {
            (note ? " &middot; note: " + esc(note) : "") + "</div></div>";
   }
   const r = row.r;
-  // Display preference: clean digital text (2008 workbook) > the matched
+  // Display preference: clean digital text (renovation workbook) > the matched
   // photo's OCR read (the engraving itself) > best scan transcription.
   const p = PHOTOS[r[2].toUpperCase() + "|" + (r[1] || r[0])];
   const insc = r[7] || (p && p[3]) || r[6] || "(no inscription recorded)";
@@ -510,7 +510,7 @@ _HELP_STAFF = r"""<details>
       does not have to be exact, and names spelled by sound (BRIAN/BRYAN,
       CATHY/KATHY) still match.</li>
   <li><b>Numbers:</b> the same number can exist twice &mdash; bricks moved in
-      the 2008 renovation were given NEW numbers, so every numeric hit says
+      the 2009 renovation were given NEW numbers, so every numeric hit says
       which numbering it is. Certificates show the <i>original</i> number
       &mdash; it is <span class="orignum">highlighted</span> on each
       result because the paper lists at the pickup site are sorted by
@@ -596,9 +596,9 @@ _HELP_PUBLIC = r"""<details>
       spelling does not have to be exact, and names spelled by sound
       (BRIAN/BRYAN, CATHY/KATHY) still match.</li>
   <li><b>Have an original brick number?</b> Type it. The same number
-      can exist twice &mdash; bricks moved in the 2008 renovation were
+      can exist twice &mdash; bricks moved in the 2009 renovation were
       given NEW numbers &mdash; so every numeric hit says which
-      numbering it is. Some bricks were not moved in 2008 and did not
+      numbering it is. Some bricks were not moved in 2009 and did not
       receive new numbers. Certificates show the <i>original</i>
       number: it is <span class="orignum">highlighted</span> on each
       result, and the paper lists at the pickup site are sorted by
@@ -617,10 +617,10 @@ _HELP_PUBLIC = r"""<details>
       photo matching never identified it at the pickup site. That does
       not mean it is gone &mdash; but it might: some bricks were too
       worn to read in their photo, some photos could not be matched to
-      a row in the lists, some photos are still being reviewed, and
-      identical copies of the same inscription are hard to tell apart
-      &mdash; your brick may well still be on a pallet. Bricks from one
-      park section mostly traveled together, so it is worth checking
+      a row in the lists, and identical copies of the same inscription
+      are hard to tell apart &mdash; your brick may well still be on a
+      pallet. Bricks from one section mostly traveled together &mdash;
+      this means that it is worth checking
       your section&rsquo;s pallet albums on
       <a href="https://www.flickr.com/photos/anchorageparksandrec/albums">Flickr</a>
       before coming in person.</li>

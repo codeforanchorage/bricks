@@ -405,7 +405,7 @@ alone is enough.
 
 | | `brick_list_xls.csv` (by area) | `tsp_brick_list_v2.csv` (by name) |
 |---|---|---|
-| source | `TSP Bricks All.xls`, the 2008 source workbook | `TSP Bricks ALL - OG List by Name - OCR.pdf`, a scan |
+| source | `TSP Bricks All.xls`, the renovation-era source workbook | `TSP Bricks ALL - OG List by Name - OCR.pdf`, a scan |
 | rows | 8,281 | 13,389 |
 | coverage | **areas A–D and H–K only** | **all bricks, including E, F, G** |
 | gives you | the section + grid position (Column/Row) | the brick # and the **buyer's name** |
@@ -436,15 +436,15 @@ classic phonetic equivalences (`consensus.phonetic_fold`) so those pairs
 compare as equal.
 
 Why two lists exist (per the 2009 *How to Find Your Brick* brochure and
-muni.org): the 2008 renovation relocated ~8,000 bricks and **renumbered** them
+muni.org): the 2009 renovation relocated ~8,000 bricks and **renumbered** them
 — those are areas A–D/H–K and the by-area list ("new brick numbers"). Areas
-E, F and G were *not* moved in 2008, so they kept their **original**
+E, F and G were *not* moved in 2009, so they kept their **original**
 (certificate) numbers and never appeared in the by-area list. The by-name
 list's Brick# is the original number for every brick. The original numbers of
 the unmoved areas are contiguous ranges, so for them the number alone gives
 the section:
 
-| original # | area | 2008 fate |
+| original # | area | 2009 fate |
 |---|---|---|
 | 1–3,377 | F | unmoved — original # still valid |
 | 8,279–9,126 | G | unmoved — original # still valid |

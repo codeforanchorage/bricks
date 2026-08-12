@@ -26,6 +26,9 @@ decisions*.csv
 searching*.png
 feedback*.png
 
+# Internal working docs from P&R (edits land in the page, not the repo)
+*.docx
+
 # Generated output: CSVs, crops, annotated images
 output/
 

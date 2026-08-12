@@ -76,7 +76,7 @@ _PAGE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>__PAGETITLE__</title>
+<title>__PAGETITLE__</title>__GA__
 <style>
  body { font-family: system-ui, sans-serif; margin: 0; background: #f4f2ee;
         color: #1d2733; }
@@ -715,6 +715,20 @@ _NEXTSTEP_PUBLIC = r"""&#9989; <b>Found your brick?</b> Note its
  <b>October&nbsp;10, 2026</b> - details under &ldquo;About this
  search&rdquo; below."""
 
+# Google Analytics (public build only -- the staff page sits behind
+# basic auth and its lookups would pollute the visitor stats). Same
+# GA4 property as anchoragefood.org; brick traffic is separable in
+# reports by Hostname. Kept on ONE line so the JS-syntax checkers'
+# <script>\n anchor still finds only the main script block.
+_GA_ID = "G-9EKL33E5VS"
+_GA_SNIPPET = (
+    "\n<script async "
+    f'src="https://www.googletagmanager.com/gtag/js?id={_GA_ID}"></script>'
+    "\n<script>window.dataLayer = window.dataLayer || [];"
+    "function gtag(){dataLayer.push(arguments);}"
+    f"gtag('js', new Date());gtag('config', '{_GA_ID}');</script>"
+)
+
 # Inserted into the public help only when the build carries photo links.
 _PUBVERIFY = r"""
   <li><b>See the brick:</b> <span class="chip photo">at pickup site</span>
@@ -869,6 +883,7 @@ def main(argv=None) -> None:
                  .replace("__SECPAL__", _section_pallet_guide(photos))
                  if args.public else _HELP_STAFF)
     page = (_PAGE
+            .replace("__GA__", _GA_SNIPPET if args.public else "")
             .replace("__NAVCSS__", "" if args.public else NAV_CSS)
             .replace("__NAV__", "" if args.public else nav_html("search.html"))
             .replace("__PAGETITLE__", title)

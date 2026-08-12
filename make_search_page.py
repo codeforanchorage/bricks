@@ -310,7 +310,7 @@ function card(row, idx) {
     return '<div class="card" data-idx="' + idx + '">' +
            locBadges("", pallet) +
            '<div class="insc">' + esc(read || "(unreadable)") + "</div>" +
-           '<div class="sub"><span class="chip warn">unofficial &mdash; ' +
+           '<div class="sub"><span class="chip warn">unofficial - ' +
            "not in official records</span>" +
            '<span class="chip photo">at pickup site</span>' +
            (SHOW_PHOTOS ? ' <button class="verify" onclick="togglePanel(this,' +
@@ -367,7 +367,7 @@ function togglePanel(button, idx) {
          'onerror="this.style.display=\'none\'">' +
          '<div class="cap">&#128269; <b>Click the photo to enlarge it</b> ' +
          '&middot; what the computer read: ' +
-         esc(p[3] || "&mdash;") + "</div>";
+         esc(p[3] || "-") + "</div>";
   }
   h += '<img class="striprow" loading="lazy" src="' + PHOTO_BASE +
        '/strips/' + encodeURIComponent(r[0]) + '.jpg" ' +
@@ -466,7 +466,7 @@ function run() {
   } else {
     hits = searchText(q);
     label = hits.length ? "Top " + hits.length + " match(es) of " +
-            ROWS.length + " bricks" : "No matches — try fewer words or just the surname";
+            ROWS.length + " bricks" : "No matches - try fewer words or just the surname";
   }
   meta.textContent = label;
   lastHits = hits;
@@ -503,30 +503,30 @@ document.addEventListener("keydown", e => {
 """
 
 _HELP_STAFF = r"""<details>
- <summary>Front desk &mdash; how to use this page</summary>
+ <summary>Front desk - how to use this page</summary>
  <ol>
   <li><b>Ask for the name on the brick</b> (or words they remember from it),
-      or the number from their certificate. Type it above &mdash; spelling
+      or the number from their certificate. Type it above - spelling
       does not have to be exact, and names spelled by sound (BRIAN/BRYAN,
       CATHY/KATHY) still match.</li>
-  <li><b>Numbers:</b> the same number can exist twice &mdash; bricks moved in
+  <li><b>Numbers:</b> the same number can exist twice - bricks moved in
       the 2009 renovation were given NEW numbers, so every numeric hit says
       which numbering it is. Certificates show the <i>original</i> number
-      &mdash; it is <span class="orignum">highlighted</span> on each
+      - it is <span class="orignum">highlighted</span> on each
       result because the paper lists at the pickup site are sorted by
       it.</li>
   <li><b>Read the visitor the result:</b> the dark
       <span class="badge sec">Park section</span> badge is where the
       brick was in the park (the official list's section); the gold
       <span class="badge pal">Pickup pallet</span> badge is the folder
-      its photo came from &mdash; the pallet it is stacked on at the
+      its photo came from - the pallet it is stacked on at the
       pickup site.
       An <span class="chip photo">at pickup site</span> chip means the
-      brick was photographed there &mdash; it made the move from Town
+      brick was photographed there - it made the move from Town
       Square. Every pallet has now been photographed, so
       <span class="chip ok">in the official records</span> with NO
       pickup-site chip means the brick is real but was not identified
-      in the photos &mdash; some bricks were too worn to read, some
+      in the photos - some bricks were too worn to read, some
       photos matched no list row, some are still in human review, and
       identical copies of the same inscription are hard to tell apart.
       Treat it as &ldquo;not yet located&rdquo;, not lost: bricks from
@@ -536,13 +536,13 @@ _HELP_STAFF = r"""<details>
       <span class="chip ok">in the official records</span> the brick is on
       the official brick lists;
       <span class="chip warn">needs verification</span> the two
-      official lists disagree about this row &mdash; take the visitor's name
+      official lists disagree about this row - take the visitor's name
       and contact info for follow-up, do not promise the brick;
       <span class="chip gray">no brick made</span> the purchase is recorded
       but no brick was ever engraved.</li>
   <li><b>Checking a match before pickup:</b> the
       <span class="chip photo">at pickup site</span> bricks have a
-      <b>show me a picture of the brick &#128247;</b> button &mdash; it
+      <b>show me a picture of the brick &#128247;</b> button - it
       opens the warehouse photo (click the photo to enlarge it), what the
       computer read from it, and the brick&rsquo;s row in the scanned
       official list. If the photo doesn&rsquo;t say what the list row
@@ -550,18 +550,18 @@ _HELP_STAFF = r"""<details>
       promising the brick.</li>
   <li><b>&ldquo;Unofficial&rdquo; results</b> are bricks a reviewer
       confirmed exist at the pickup site but are missing from the official
-      lists &mdash; they show what the brick reads and which pallet holds
+      lists - they show what the brick reads and which pallet holds
       it. The photo is the record; the visitor can still claim it.</li>
   <li><b>Not found at all?</b> Try fewer words, or just the surname. If it
       is genuinely absent, take contact info and add it to the follow-up
-      list &mdash; photos are still being reviewed, so absence today is
+      list - photos are still being reviewed, so absence today is
       strong evidence but not the final word.</li>
   <li><b>Every claimant</b> (or their designated representative) must
       also complete the Municipality&rsquo;s
       <a href="https://forms.office.com/Pages/ResponsePage.aspx?id=y3h6EsUZykaxH4fDPEmpB6XezpspokpJu5-tBv5K8IBUQTEwUFBLME9WSkxSUTcwR0ZIVFk2V1JYNS4u">attestation
       form</a> (online, no printing) before taking a brick. In-person
       pickup only, no shipping. Pickup runs through
-      <b>October&nbsp;10, 2026</b> &mdash; generally Mon &amp; Thu
+      <b>October&nbsp;10, 2026</b> - generally Mon &amp; Thu
       10&ndash;2, Sat 10&ndash;12 (exact dates on the
       <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">official
       page</a>); after that, bricks are no longer individually
@@ -570,11 +570,11 @@ _HELP_STAFF = r"""<details>
 </details>"""
 
 _HELP_PUBLIC = r"""<details>
- <summary>About this search &mdash; a Code for Anchorage volunteer
+ <summary>About this search - a Code for Anchorage volunteer
  project</summary>
  <p><b>This is a volunteer project of
  <a href="https://codeforanchorage.org/">Code for Anchorage</a></b>
- &mdash; an extra tool to help you find your brick, alongside the
+ - an extra tool to help you find your brick, alongside the
  Municipality&rsquo;s official
  <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">pickup
  process</a>. Parks &amp; Recreation employees and volunteers
@@ -586,18 +586,18 @@ _HELP_PUBLIC = r"""<details>
  at the pickup site. If that happens, the best way to look for it is
  to browse Parks &amp; Recreation&rsquo;s
  <a href="https://www.flickr.com/photos/anchorageparksandrec/albums">Flickr
- photo albums</a> &mdash; one album per pallet &mdash; and see if the
+ photo albums</a> - one album per pallet - and see if the
  brick is there (the section-to-pallet list below says which albums to
  check). Unfortunately, some bricks did not survive the move.</p>
  <p class="grp"><b>Finding your brick</b></p>
  <ol>
   <li><b>Type the name on the brick</b>, words you remember from its
-      inscription, or the brick number from your certificate &mdash;
+      inscription, or the brick number from your certificate -
       spelling does not have to be exact, and names spelled by sound
       (BRIAN/BRYAN, CATHY/KATHY) still match.</li>
   <li><b>Have an original brick number?</b> Type it. The same number
-      can exist twice &mdash; bricks moved in the 2009 renovation were
-      given NEW numbers &mdash; so every numeric hit says which
+      can exist twice - bricks moved in the 2009 renovation were
+      given NEW numbers - so every numeric hit says which
       numbering it is. Some bricks were not moved in 2009 and did not
       receive new numbers. Certificates show the <i>original</i>
       number: it is <span class="orignum">highlighted</span> on each
@@ -609,24 +609,24 @@ _HELP_PUBLIC = r"""<details>
       <span class="badge pal">Pickup pallet</span> badge is the pallet
       it is stacked on at the pickup site. An
       <span class="chip photo">at pickup site</span> chip means the
-      brick was photographed there &mdash; it made the move and is on
+      brick was photographed there - it made the move and is on
       that pallet.</li>
   <li><b>Only <span class="chip ok">in the official records</span>, no
       <span class="chip photo">at pickup site</span> chip?</b> The brick
-      is real &mdash; there is an official record of it &mdash; but the
+      is real - there is an official record of it - but the
       photo matching never identified it at the pickup site. That does
-      not mean it is gone &mdash; but it might: some bricks were too
+      not mean it is gone - but it might: some bricks were too
       worn to read in their photo, some photos could not be matched to
       a row in the lists, and identical copies of the same inscription
-      are hard to tell apart &mdash; your brick may well still be on a
-      pallet. Bricks from one section mostly traveled together &mdash;
+      are hard to tell apart - your brick may well still be on a
+      pallet. Bricks from one section mostly traveled together -
       this means that it is worth checking
       your section&rsquo;s pallet albums on
       <a href="https://www.flickr.com/photos/anchorageparksandrec/albums">Flickr</a>
       before coming in person.</li>
   <li><b>Which pallet albums hold my park section?</b> Bricks mostly
       moved to the pallet(s) sharing their section&rsquo;s letter
-      &mdash; here is where each section&rsquo;s bricks actually ended
+      - here is where each section&rsquo;s bricks actually ended
       up: __SECPAL__ (a few strays landed on other pallets, so the
       search result&rsquo;s gold badge is always the surest
       answer).</li>
@@ -635,56 +635,56 @@ _HELP_PUBLIC = r"""<details>
       official lists disagree about this row;
       <span class="chip gray">no brick made</span> the official list
       itself marks this sale &ldquo;no brick / no inscription&rdquo;
-      &mdash; the purchase is recorded but no brick was ever
+      - the purchase is recorded but no brick was ever
       engraved.</li>__PUBVERIFY__
   <li><b>&ldquo;Unofficial&rdquo; results</b> are bricks confirmed to exist
-      at the pickup site but missing from the official lists &mdash; they
+      at the pickup site but missing from the official lists - they
       show what the brick reads and which pallet holds it. They can still
       be claimed.</li>
   <li><b>Not found at all?</b> Try fewer words, or just the surname.
       If it still doesn&rsquo;t appear, it may be a brick this project
-      could not read or match &mdash; or one of the estimated 1,700
+      could not read or match - or one of the estimated 1,700
       bricks the Municipality says did not survive the move. Before
       coming to look in person, we recommend searching your
       section&rsquo;s pallet albums on
       <a href="https://www.flickr.com/photos/anchorageparksandrec/albums">Flickr</a>
-      to see if it is there &mdash; every brick at the pickup site was
+      to see if it is there - every brick at the pickup site was
       photographed, so if it is not in the albums it is not
       there.</li>
  </ol>
  <p class="grp"><b>Picking it up</b></p>
  <ol>
-  <li><b>Where and when:</b> <b>2839 Mountain View Dr</b> &mdash;
+  <li><b>Where and when:</b> <b>2839 Mountain View Dr</b> -
       generally Mondays &amp; Thursdays
       10&nbsp;AM&ndash;2&nbsp;PM and Saturdays
       10&nbsp;AM&ndash;12&nbsp;PM, through <b>October&nbsp;10, 2026</b>
       (exact dates on the
       <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">official
       pickup page</a>). In person only; shipping is not available. It is
-      a hands-on, come-find-your-brick experience &mdash; the pallet
+      a hands-on, come-find-your-brick experience - the pallet
       badge on your search result is where to start looking. Parking is
       limited; carpooling is encouraged.</li>
   <li><b>One form to fill out:</b> every claimant completes the
       Municipality&rsquo;s
       <a href="https://forms.office.com/Pages/ResponsePage.aspx?id=y3h6EsUZykaxH4fDPEmpB6XezpspokpJu5-tBv5K8IBUQTEwUFBLME9WSkxSUTcwR0ZIVFk2V1JYNS4u">online
-      attestation form</a> &mdash; no printing needed.</li>
+      attestation form</a> - no printing needed.</li>
   <li><b>After October 10, 2026</b> bricks are no longer individually
       tracked. Unclaimed bricks may be repurposed, donated to
       historical organizations, or disposed of.</li>
  </ol>
  <p class="grp"><b>Common questions</b></p>
  <ul>
-  <li><b>Can someone pick it up for me?</b> Yes &mdash; a designated
+  <li><b>Can someone pick it up for me?</b> Yes - a designated
       representative can claim it for you. There is no separate
       paperwork to designate them: they simply complete the same
       attestation form (online) on your behalf.</li>
   <li><b>The buyer has passed away?</b> Family claims like this are
       exactly what the pickup is for. Fill out the online attestation
       form, find which pallet the brick is on, and come find it on a
-      pickup day &mdash; email
+      pickup day - email
       <a href="mailto:parkvolunteers@anchorageak.gov">parkvolunteers@anchorageak.gov</a>
       if you are unsure how to fill out the form.</li>
-  <li><b>Will ID be checked?</b> No &mdash; the attestation form is
+  <li><b>Will ID be checked?</b> No, the attestation form is
       how claims are recorded.</li>
   <li><b>Questions this page can&rsquo;t answer?</b> Check the FAQs on
       the
@@ -692,7 +692,7 @@ _HELP_PUBLIC = r"""<details>
       Commemorative Brick Return page</a>; if you still have questions,
       email
       <a href="mailto:parkvolunteers@anchorageak.gov">parkvolunteers@anchorageak.gov</a>
-      &mdash; they run the pickup.</li>
+      - they run the pickup.</li>
  </ul>
  <p class="buildnote">__BUILDNOTE__</p>
 </details>"""
@@ -701,7 +701,7 @@ _INTRO_PUBLIC = r"""<div id="intro">
  <p><b>Did you or your family buy an engraved brick at
  Anchorage&rsquo;s Town Square Park in 1992&ndash;93?</b> The park is
  being rebuilt, and the Municipality is returning the bricks to their
- owners &mdash; in person, through <b>October&nbsp;10, 2026</b>. Search
+ owners - in person, through <b>October&nbsp;10, 2026</b>. Search
  below to see if your brick is waiting at the pickup site.
  (<a href="https://www.adn.com/alaska-news/anchorage/2026/08/11/thousands-of-town-square-park-bricks-marked-with-meaning-wait-for-their-owners/">Anchorage
  Daily News story</a> &middot;
@@ -713,14 +713,14 @@ _NEXTSTEP_PUBLIC = r"""&#9989; <b>Found your brick?</b> Note its
  <span class="orignum">original #</span> and gold pallet badge, then
  claim it in person at <b>2839 Mountain View Dr</b> (Mon &amp; Thu
  10&nbsp;AM&ndash;2&nbsp;PM, Sat 10&nbsp;AM&ndash;12&nbsp;PM) by
- <b>October&nbsp;10, 2026</b> &mdash; details under &ldquo;About this
+ <b>October&nbsp;10, 2026</b> - details under &ldquo;About this
  search&rdquo; below."""
 
 # Inserted into the public help only when the build carries photo links.
 _PUBVERIFY = r"""
   <li><b>See the brick:</b> <span class="chip photo">at pickup site</span>
       bricks have a <b>show me a picture of the brick &#128247;</b>
-      button &mdash; it opens the pickup-site photo (click the photo to
+      button - it opens the pickup-site photo (click the photo to
       enlarge it), what the computer read from it, and a snapshot of
       the brick&rsquo;s row in the scanned original list. If a photo
       doesn&rsquo;t load, the record text still stands.</li>"""
@@ -859,7 +859,7 @@ def main(argv=None) -> None:
                  "from the official lists).")
 
     title = ("Anchorage Town Square Brick Search" if args.public
-             else "Town Square bricks &mdash; pickup counter search")
+             else "Town Square bricks - pickup counter search")
     photo_base = args.photo_base_url.rstrip("/") or "photos"
     # Public builds show photo UI only when pointed at a hosted tree --
     # a relative path would 404 on GitHub Pages (no images in the repo).

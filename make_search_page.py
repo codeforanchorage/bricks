@@ -649,8 +649,8 @@ _HELP_PUBLIC = r"""<details>
       section&rsquo;s pallet albums on
       <a href="https://www.flickr.com/photos/anchorageparksandrec/albums">Flickr</a>
       to see if it is there &mdash; every brick at the pickup site was
-      photographed, so if it is not in the albums it is almost
-      certainly not there.</li>
+      photographed, so if it is not in the albums it is not
+      there.</li>
  </ol>
  <p class="grp"><b>Picking it up</b></p>
  <ol>
@@ -667,10 +667,9 @@ _HELP_PUBLIC = r"""<details>
   <li><b>One form to fill out:</b> every claimant completes the
       Municipality&rsquo;s
       <a href="https://forms.office.com/Pages/ResponsePage.aspx?id=y3h6EsUZykaxH4fDPEmpB6XezpspokpJu5-tBv5K8IBUQTEwUFBLME9WSkxSUTcwR0ZIVFk2V1JYNS4u">online
-      attestation form</a> &mdash; no printing needed, and it can also
-      be done on site.</li>
+      attestation form</a> &mdash; no printing needed.</li>
   <li><b>After October 10, 2026</b> bricks are no longer individually
-      tracked &mdash; unclaimed bricks may be repurposed, donated to
+      tracked. Unclaimed bricks may be repurposed, donated to
       historical organizations, or disposed of.</li>
  </ol>
  <p class="grp"><b>Common questions</b></p>
@@ -678,7 +677,7 @@ _HELP_PUBLIC = r"""<details>
   <li><b>Can someone pick it up for me?</b> Yes &mdash; a designated
       representative can claim it for you. There is no separate
       paperwork to designate them: they simply complete the same
-      attestation form (online or on site) on your behalf.</li>
+      attestation form (online) on your behalf.</li>
   <li><b>The buyer has passed away?</b> Family claims like this are
       exactly what the pickup is for. Fill out the online attestation
       form, find which pallet the brick is on, and come find it on a

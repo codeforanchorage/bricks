@@ -687,7 +687,7 @@ _NEXTSTEP_PUBLIC = r"""&#9989; <b>Found your brick?</b> Note its
  claim it in person at <b>2839 Mountain View Dr</b> (Mon &amp; Thu
  10&nbsp;AM&ndash;2&nbsp;PM, Sat 10&nbsp;AM&ndash;12&nbsp;PM) by
  <b>October&nbsp;10, 2026</b> &mdash; details under &ldquo;About this
- search&rdquo; above."""
+ search&rdquo; below."""
 
 # Inserted into the public help only when the build carries photo links.
 _PUBVERIFY = r"""

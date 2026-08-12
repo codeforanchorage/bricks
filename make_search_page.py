@@ -51,7 +51,9 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import re
 import sys
+from collections import Counter
 from datetime import date
 from pathlib import Path
 
@@ -575,43 +577,59 @@ _HELP_PUBLIC = r"""<details>
  &mdash; an extra tool to help you find your brick, alongside the
  Municipality&rsquo;s official
  <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">pickup
- process</a>. Parks &amp; Recreation employees photographed every
- pallet at the pickup site, and volunteers used text-reading (OCR)
- scripts to match the photos to the official brick lists. It is not
- an official Municipality record: some bricks were not readable in
- their photos and some photos matched no list row, so a brick that does
- not appear as found here may still be at the pickup site. Sadly, some
- bricks also did not survive the move.</p>
+ process</a>. Parks &amp; Recreation employees and volunteers
+ photographed every brick on every pallet at the pickup site, and
+ volunteers used text-reading (OCR) scripts to match the photos to the
+ official brick lists. It is not an official Municipality record: some
+ bricks were not readable in their photos and some photos matched no
+ list row, so a brick that does not appear as found here may still be
+ at the pickup site. If that happens, the best way to look for it is
+ to browse Parks &amp; Recreation&rsquo;s
+ <a href="https://www.flickr.com/photos/anchorageparksandrec/albums">Flickr
+ photo albums</a> &mdash; one album per pallet &mdash; and see if the
+ brick is there (the section-to-pallet list below says which albums to
+ check). Unfortunately, some bricks did not survive the move.</p>
  <p class="grp"><b>Finding your brick</b></p>
  <ol>
   <li><b>Type the name on the brick</b>, words you remember from its
       inscription, or the brick number from your certificate &mdash;
       spelling does not have to be exact, and names spelled by sound
       (BRIAN/BRYAN, CATHY/KATHY) still match.</li>
-  <li><b>Have a certificate number?</b> Type it. The same number can
-      exist twice &mdash; bricks moved in the 2008 renovation were given
-      NEW numbers &mdash; so every numeric hit says which numbering it
-      is. Certificates show the <i>original</i> number: it is
-      <span class="orignum">highlighted</span> on each result, and the
-      paper lists at the pickup site are sorted by it.</li>
+  <li><b>Have an original brick number?</b> Type it. The same number
+      can exist twice &mdash; bricks moved in the 2008 renovation were
+      given NEW numbers &mdash; so every numeric hit says which
+      numbering it is. Some bricks were not moved in 2008 and did not
+      receive new numbers. Certificates show the <i>original</i>
+      number: it is <span class="orignum">highlighted</span> on each
+      result, and the paper lists at the pickup site are sorted by
+      it.</li>
   <li><b>The badges say where to look:</b> the dark
       <span class="badge sec">Park section</span> badge is where the
       brick was in Town Square; the gold
       <span class="badge pal">Pickup pallet</span> badge is the pallet
       it is stacked on at the pickup site. An
       <span class="chip photo">at pickup site</span> chip means the
-      brick was photographed there &mdash; it made the move.</li>
+      brick was photographed there &mdash; it made the move and is on
+      that pallet.</li>
   <li><b>Only <span class="chip ok">in the official records</span>, no
       <span class="chip photo">at pickup site</span> chip?</b> The brick
       is real &mdash; there is an official record of it &mdash; but the
       photo matching never identified it at the pickup site. That does
-      NOT mean it is gone: some bricks were too worn to read in their
-      photo, some photos could not be matched to a row in the lists,
-      some photos are still being reviewed, and identical copies of the
-      same inscription are hard to tell apart &mdash; your brick may
-      well still be on a pallet. Bricks from one park section mostly
-      traveled together, so it is worth checking your section's pallets
-      in person.</li>
+      not mean it is gone &mdash; but it might: some bricks were too
+      worn to read in their photo, some photos could not be matched to
+      a row in the lists, some photos are still being reviewed, and
+      identical copies of the same inscription are hard to tell apart
+      &mdash; your brick may well still be on a pallet. Bricks from one
+      park section mostly traveled together, so it is worth checking
+      your section&rsquo;s pallet albums on
+      <a href="https://www.flickr.com/photos/anchorageparksandrec/albums">Flickr</a>
+      before coming in person.</li>
+  <li><b>Which pallet albums hold my park section?</b> Bricks mostly
+      moved to the pallet(s) sharing their section&rsquo;s letter
+      &mdash; here is where each section&rsquo;s bricks actually ended
+      up: __SECPAL__ (a few strays landed on other pallets, so the
+      search result&rsquo;s gold badge is always the surest
+      answer).</li>
   <li><b>Other statuses:</b>
       <span class="chip warn">needs verification</span> the two
       official lists disagree about this row;
@@ -623,11 +641,16 @@ _HELP_PUBLIC = r"""<details>
       at the pickup site but missing from the official lists &mdash; they
       show what the brick reads and which pallet holds it. They can still
       be claimed.</li>
-  <li><b>Not found at all?</b> Try fewer words, or just the surname. If
-      it still doesn&rsquo;t appear, it may be a brick this project
-      could not read or match &mdash; or one of the small portion the
-      Municipality says did not survive the move. Coming to look in
-      person is still worthwhile.</li>
+  <li><b>Not found at all?</b> Try fewer words, or just the surname.
+      If it still doesn&rsquo;t appear, it may be a brick this project
+      could not read or match &mdash; or one of the estimated 1,700
+      bricks the Municipality says did not survive the move. Before
+      coming to look in person, we recommend searching your
+      section&rsquo;s pallet albums on
+      <a href="https://www.flickr.com/photos/anchorageparksandrec/albums">Flickr</a>
+      to see if it is there &mdash; every brick at the pickup site was
+      photographed, so if it is not in the albums it is almost
+      certainly not there.</li>
  </ol>
  <p class="grp"><b>Picking it up</b></p>
  <ol>
@@ -647,8 +670,8 @@ _HELP_PUBLIC = r"""<details>
       attestation form</a> &mdash; no printing needed, and it can also
       be done on site.</li>
   <li><b>After October 10, 2026</b> bricks are no longer individually
-      tracked &mdash; unclaimed bricks may be repurposed or donated to
-      historical organizations.</li>
+      tracked &mdash; unclaimed bricks may be repurposed, donated to
+      historical organizations, or disposed of.</li>
  </ol>
  <p class="grp"><b>Common questions</b></p>
  <ul>
@@ -657,13 +680,18 @@ _HELP_PUBLIC = r"""<details>
       paperwork to designate them: they simply complete the same
       attestation form (online or on site) on your behalf.</li>
   <li><b>The buyer has passed away?</b> Family claims like this are
-      exactly what the pickup is for &mdash; email
+      exactly what the pickup is for. Fill out the online attestation
+      form, find which pallet the brick is on, and come find it on a
+      pickup day &mdash; email
       <a href="mailto:parkvolunteers@anchorageak.gov">parkvolunteers@anchorageak.gov</a>
-      if you are unsure how to fill out the form for them.</li>
-  <li><b>Will ID be checked?</b> The official instructions do not
-      mention an ID check &mdash; the signed attestation form is how
-      claims are recorded.</li>
-  <li><b>Questions this page can&rsquo;t answer?</b> Email
+      if you are unsure how to fill out the form.</li>
+  <li><b>Will ID be checked?</b> No &mdash; the attestation form is
+      how claims are recorded.</li>
+  <li><b>Questions this page can&rsquo;t answer?</b> Check the FAQs on
+      the
+      <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">official
+      Commemorative Brick Return page</a>; if you still have questions,
+      email
       <a href="mailto:parkvolunteers@anchorageak.gov">parkvolunteers@anchorageak.gov</a>
       &mdash; they run the pickup.</li>
  </ul>
@@ -693,10 +721,10 @@ _NEXTSTEP_PUBLIC = r"""&#9989; <b>Found your brick?</b> Note its
 _PUBVERIFY = r"""
   <li><b>See the brick:</b> <span class="chip photo">at pickup site</span>
       bricks have a <b>show me a picture of the brick &#128247;</b>
-      button &mdash; it opens the warehouse photo (click the photo to
-      enlarge it), what the computer read from it, and the brick&rsquo;s
-      row in the scanned official list. If a photo doesn&rsquo;t load,
-      the record text still stands.</li>"""
+      button &mdash; it opens the pickup-site photo (click the photo to
+      enlarge it), what the computer read from it, and a snapshot of
+      the brick&rsquo;s row in the scanned original list. If a photo
+      doesn&rsquo;t load, the record text still stands.</li>"""
 
 
 def _load_master(path: Path) -> list[list[str]]:
@@ -753,6 +781,33 @@ def _load_photos(paths: list[Path]) -> tuple[dict[str, list], list[list]]:
                                        row.get("matched_read", ""),
                                        row.get("review_note", "")])
     return photos, unofficial
+
+
+def _section_pallet_guide(photos: dict[str, list]) -> str:
+    """Which Flickr pallet album(s) hold each park section's bricks.
+
+    Sections mostly moved to same-letter pallets, but not always
+    (section F is largely on pallet H2); a pallet is listed once it
+    holds >=10% of a section's photographed bricks, so single strays
+    don't clutter the guide. Letters get the serif .lt span the badges
+    use (I vs 1/l).
+    """
+    per_section: dict[str, Counter] = {}
+    for key, val in photos.items():
+        section = key.split("|", 1)[0]
+        pallet = re.sub(r"(?i)^pallet\s+", "", val[0])
+        if section and pallet:
+            per_section.setdefault(section, Counter())[pallet] += 1
+    parts = []
+    for section in sorted(per_section):
+        counts = per_section[section]
+        cutoff = sum(counts.values()) * 0.10
+        pallets = sorted(p for p, n in counts.items() if n >= cutoff)
+        pallet_html = ", ".join(f'<span class="lt">{p}</span>'
+                                for p in pallets)
+        parts.append(f'<span class="lt">{section}</span>&nbsp;&rarr;&nbsp;'
+                     + pallet_html)
+    return " &middot; ".join(parts)
 
 
 def _json(value) -> str:
@@ -813,6 +868,7 @@ def main(argv=None) -> None:
     help_html = (_HELP_PUBLIC.replace(
                      "__PUBVERIFY__", _PUBVERIFY if show_photos else "")
                  .replace("__BUILDNOTE__", buildnote)
+                 .replace("__SECPAL__", _section_pallet_guide(photos))
                  if args.public else _HELP_STAFF)
     page = (_PAGE
             .replace("__NAVCSS__", "" if args.public else NAV_CSS)

@@ -717,10 +717,11 @@ _NEXTSTEP_PUBLIC = r"""&#9989; <b>Found your brick?</b> Note its
 
 # Google Analytics (public build only -- the staff page sits behind
 # basic auth and its lookups would pollute the visitor stats). The
-# brick search has its own web data stream in the Code for Anchorage
-# GA4 property. Kept on ONE line so the JS-syntax checkers'
-# <script>\n anchor still finds only the main script block.
-_GA_ID = "G-MMTZFHYC9D"
+# brick search has its own dedicated GA4 property (Town Square
+# Bricks), so its reports never blend with other Code for Anchorage
+# sites. Kept on ONE line so the JS-syntax checkers' <script>\n
+# anchor still finds only the main script block.
+_GA_ID = "G-Q39SBW9M3P"
 _GA_SNIPPET = (
     "\n<script async "
     f'src="https://www.googletagmanager.com/gtag/js?id={_GA_ID}"></script>'

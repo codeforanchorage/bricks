@@ -721,7 +721,7 @@ _NEXTSTEP_PUBLIC = r"""&#9989; <b>Found your brick?</b> Note its
 # Bricks), so its reports never blend with other Code for Anchorage
 # sites. Kept on ONE line so the JS-syntax checkers' <script>\n
 # anchor still finds only the main script block.
-_GA_ID = "G-Q39SBW9M3P"
+_GA_ID = "G-NXMTEL5HGQ"
 _GA_SNIPPET = (
     "\n<script async "
     f'src="https://www.googletagmanager.com/gtag/js?id={_GA_ID}"></script>'

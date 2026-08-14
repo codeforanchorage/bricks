@@ -265,7 +265,8 @@ brick-ocr/
   apply_decisions.py   fold a reviewer's decisions.csv back into the catalogue
   make_report.py       build the Parks & Rec Excel workbook (per-section,
                        reviewer notes, Unofficial-bricks sheet)
-  make_pallet_report.py  the warehouse workbook: one tab per PALLET, rows in
+  make_pallet_report.py
+                       the warehouse workbook: one tab per PALLET, rows in
                        original-number order -- printed and posted per pallet
   classify_photos.py   label unmatched photos: single brick / stack / other
   run_pipeline.py      the whole loop in one command (see workflow below)
@@ -448,8 +449,8 @@ recipe (subdomain, basic auth, token, upload, pulling decisions back).
 The **public** page is a separate build of the same search page
 (`make_search_page.py --public`): visitor-facing help text, no nav bar,
 no token — safe to publish. It is committed as `docs/index.html` and
-served by GitHub Pages at https://codeforanchorage.org/bricks/ ;
-refreshing it is rebuild-then-commit. Photos are not in the repo (far
+served by GitHub Pages at https://codeforanchorage.org/bricks/.
+Refreshing it is rebuild-then-commit. Photos are not in the repo (far
 too big), so `--photo-base-url` makes the public page hotlink the hosted
 derivative trees; omit it for a pure text-search build. Google Analytics
 (GA4) is injected on the `--public` build only — the staff pages carry

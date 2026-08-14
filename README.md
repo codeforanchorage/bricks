@@ -1,36 +1,77 @@
-# Brick OCR Test Pipeline
+# Town Square bricks — OCR catalogue and pickup search
 
-Test harness for cataloguing the ~13,000 commemorative paver bricks being
-removed from Town Square Park (Municipality of Anchorage). It runs nadir
-(downward-facing) brick photos through four text-extraction methods and
-writes a comparison so we can judge which approach to scale up.
+Tools for cataloguing the ~13,000 commemorative paver bricks removed from
+Town Square Park (Municipality of Anchorage) during the park's renovation.
+Every brick was photographed on its warehouse pallet; a vision LLM reads
+each photo, the read is fuzzy-matched against the Municipality's official
+brick lists, humans review the leftovers in a hosted click-through page,
+and the results feed a public search page plus Excel reports for Parks &
+Recreation — so a brick buyer can learn up front whether their brick
+survived the move and which pallet it sits on, instead of searching a
+warehouse.
 
-**Why:** the bricks are being lifted and moved by section to a warehouse,
-where people will come to reclaim their own. OCR-reading every brick and
-matching it against the Municipality's official brick list lets us tell
-someone up front whether their brick survived the move — so they don't have
-to search a whole pallet.
+**Live public search page:** https://codeforanchorage.org/bricks/
+(GitHub Pages, built from `docs/` in this repo). The staff review and
+verification pages are hosted separately behind basic auth — see
+`web/DEPLOY_DREAMHOST.md` for the full hosting recipe.
 
-| Method | Engine | Runs on |
-|--------|--------|---------|
-| 1 | **PaddleOCR** | local OCR, GPU if available (CPU fallback) |
-| 2 | **Claude Sonnet 4.6** | `claude-sonnet-4-6` via the Anthropic API |
-| 3 | **Gemini 2.5 Pro** | `gemini-2.5-pro` via the Google Gemini API |
-| 4 | **Gemini 2.5 Flash** | `gemini-2.5-flash` via the Google Gemini API |
+The system end to end (`run_pipeline.py` runs the whole loop in order):
+
+1. **Photograph** — one photo per brick, filed by warehouse pallet
+   (`photos/pallets/<pallet>/IMG.jpg`).
+2. **OCR** — `single_pipeline.py` reads every photo with the production
+   model **Gemini 3.1 Flash-Lite**; parallel, resumable, retrying.
+3. **Reference build** — parse the two official Municipality brick lists
+   and merge them into one master lookup (`parse_xls_list.py`,
+   `parse_tsp_list.py` → `resolve_tsp_rows.py`, `merge_lists.py`).
+4. **Match** — `match.py` fuzzy-matches each photo read against the
+   master list (scan-confusable folding, phonetic folding, token
+   containment with a uniqueness margin).
+5. **Human review** — `make_review_page.py` and `make_fp_page.py` build
+   hosted click-through pages; decisions autosave to a small PHP
+   receiver (`web/receiver.php`) and `apply_decisions.py` folds them
+   back into the catalogue.
+6. **Deliverables** — `make_search_page.py` (staff and public search
+   pages), `make_report.py` (per-section Excel workbook),
+   `make_pallet_report.py` (per-pallet workbook for the warehouse
+   floor), and per-section `missing_<S>.csv` lost/broken candidate
+   lists.
+
+A pytest **regression gate** — 26 labeled warehouse photos that must all
+match with zero false positives — runs before any rebuilt data ships.
+
+## Which models, exactly
+
+| Where | Model | Notes |
+|---|---|---|
+| Production photo OCR (`single_pipeline.py`) | `gemini-3.1-flash-lite` | validated 26/26 on the labeled set, zero wrong IDs |
+| Second opinion / escalation | `gemini-3-flash-preview` | scored identically; its hidden thinking tokens bill as output, ~10x the cost in bulk |
+| Scan-row re-reads (`rescan_rows.py`) | `gemini-3.1-flash-lite` + `gemini-3.5-flash-lite` | a new read is adopted only when both models agree |
+| Unmatched-photo classification (`classify_photos.py`) | `gemini-3.1-flash-lite` | labels photos single brick / stack / other |
+| One-time list re-OCR (`reocr_tsp_pdf.py`, `resolve_tsp_rows.py`) | `gemini-2.5-flash` | historical builds of the by-name list, already done |
+
+## The method-comparison harness (`pipeline.py`)
+
+The project started as a bake-off, and `pipeline.py` still runs any mix
+of methods side by side (`--methods`): **PaddleOCR** (local, GPU
+optional), **Claude Sonnet 4.6** (`claude-sonnet-4-6`), **Claude Sonnet
+5** (`claude-sonnet-5`), **Gemini 2.5 Pro**, **Gemini 2.5 Flash**
+(deprecated by Google, shutdown 2026-10-16), **Gemini 3 Flash Preview**,
+and **Gemini 3.1 / 3.5 Flash-Lite**.
 
 PaddleOCR detects text **line by line**; the pipeline then groups those
-detections back into bricks by spatial layout (see `group_bricks.py`), so both
+detections back into bricks by spatial layout (see `group_bricks.py`), so all
 methods produce **one row per brick** for an apples-to-apples comparison. Pass
 `--no-group` to inspect PaddleOCR's raw per-line detections instead.
 
 ## Requirements
 
 - **Python 3.11, 3.12, or 3.13.**
-  > ⚠️ **Not Python 3.14.** `paddlepaddle` (PaddleOCR's runtime) publishes no
-  > wheels for 3.14, so the PaddleOCR method cannot run there. This machine
-  > currently has only Python 3.14 installed — see Setup step 1.
-- An Anthropic API key (Claude methods) and a Google Gemini API key.
-- Optional: an NVIDIA GPU for PaddleOCR acceleration.
+  > ⚠️ **Not Python 3.14** if you want the PaddleOCR method:
+  > `paddlepaddle` (PaddleOCR's runtime) publishes no wheels for 3.14.
+- A **Google Gemini API key** — this is all the production path needs.
+- Optional: an Anthropic API key (only for the Claude methods in the
+  comparison harness) and an NVIDIA GPU for PaddleOCR acceleration.
 
 ## Setup
 
@@ -63,11 +104,11 @@ pip install paddlepaddle
 pip install paddlepaddle-gpu==3.0.0 -i https://www.paddlepaddle.org.cn/packages/stable/cu126/
 ```
 
-> **GPU note — RTX 5060 (Blackwell).** This machine's GPU is an NVIDIA RTX 5060
-> Laptop (Blackwell, compute capability `sm_120`). PaddlePaddle's published GPU
-> wheels target CUDA 12.6, which predates Blackwell support, so GPU init may
-> fail. The pipeline **automatically falls back to CPU** in that case — fine for
-> a 2-image test. Pass `--no-gpu` to skip the GPU attempt entirely.
+> **GPU note — Blackwell cards (RTX 50-series).** PaddlePaddle's published
+> GPU wheels target CUDA 12.6, which predates Blackwell (`sm_120`) support,
+> so GPU init may fail on those cards. The pipeline **automatically falls
+> back to CPU** in that case — fine for small batches. Pass `--no-gpu` to
+> skip the GPU attempt entirely.
 
 ### 3. API keys
 
@@ -100,8 +141,8 @@ error row for the method that could not run.
 
 ### 4. Test images
 
-Drop the brick JPEGs into `test_images/`. For the first test, that's the 2
-nadir crops exported from the Insta360 X3 app.
+Drop a few brick JPEGs into `test_images/` to try the comparison harness
+before pointing the production runner at a full photo tree.
 
 ## Usage
 
@@ -140,12 +181,12 @@ flush, so an interrupted run keeps every finished image), with columns:
 | Column | Notes |
 |--------|-------|
 | `filename` | source image |
-| `method` | `paddleocr`, `claude-sonnet`, `gemini-pro`, `gemini-flash` |
+| `method` | `paddleocr`, `claude-sonnet`, `gemini-pro`, `gemini-lite-31`, ... (one per method run) |
 | `brick_inscription` | one row per brick; a brick's lines joined with ` / ` |
 | `confidence` | `high` / `medium` / `low`, plus `none` (nothing found) or `error` |
 
-The CSV is the seed of the eventual full Excel catalog (section, brick number,
-inscription lines).
+(The production runner, `single_pipeline.py`, writes a richer catalogue —
+see below — but this comparison CSV is where new methods get judged.)
 
 ## Tiling for higher-resolution OCR
 
@@ -204,24 +245,36 @@ brick-ocr/
   parse_tsp_list.py    parse the original by-name (all bricks) PDF into a CSV
   reocr_tsp_pdf.py     re-transcribe the scanned by-name PDF with a vision LLM
   resolve_tsp_rows.py  settle disputed rows via isolated strip reads -> v2 list
+  rescan_rows.py       re-read troublesome scan rows with two current models;
+                       adopt the new text only when both agree
   merge_lists.py       merge both lists into the master lookup table
   match.py             match the OCR catalogue against an official list
   make_review_page.py  pack the review queue into one offline review.html
                        (--receiver-url adds autosave-to-server;
                         --photo-base-url uses hosted derivatives instead of
                         embedding -- required for big queues)
-  make_search_page.py  build the pickup-counter search page (search.html)
-  make_derivatives.py  build thumbs/ + zoom/ JPEG trees for Dreamhost
+  make_fp_page.py      duplicate-claim (false-positive) check page:
+                       photos whose reads disagree but claim the same brick
+  make_search_page.py  build the pickup-counter search page (search.html);
+                       --public builds the visitor variant for GitHub Pages
+  make_derivatives.py  build thumbs/ + zoom/ JPEG trees for photo hosting
   make_strips.py       render each scanned-list row as an image; review
                        pages (--master) show it so humans read the PRINT,
                        not the OCR of it
+  strip_image.py       shared strip-cropping/rendering code
   apply_decisions.py   fold a reviewer's decisions.csv back into the catalogue
   make_report.py       build the Parks & Rec Excel workbook (per-section,
                        reviewer notes, Unofficial-bricks sheet)
+  make_pallet_report.py  the warehouse workbook: one tab per PALLET, rows in
+                       original-number order -- printed and posted per pallet
   classify_photos.py   label unmatched photos: single brick / stack / other
   run_pipeline.py      the whole loop in one command (see workflow below)
+  hostpaths.py         shared photo -> thumbs/zoom derivative path mapping
+  pagenav.py           shared nav bar for the hosted staff pages
   web/                 Dreamhost hosting: receiver.php + DEPLOY_DREAMHOST.md
-  consensus.py         collapses a comparison CSV into a triaged catalogue
+  docs/                the built PUBLIC search page, served by GitHub Pages
+  consensus.py         fold tables (scan-confusable, phonetic) + text scoring
+                       shared by the matcher and the search pages
   ocr_paddle.py        PaddleOCR wrapper
   ocr_anthropic.py     Anthropic provider (Claude)
   ocr_google.py        Google provider (Gemini)
@@ -322,7 +375,9 @@ The regression gate runs before anything ships: if the rebuilt data breaks
 validated matching, the pipeline aborts and the previous master list is
 kept at `reference/master_list.csv.prev`. Reviewer decisions are pulled
 straight from the hosted receiver (its `action=list`/`action=fetch` GET
-API), so a hosted review round needs no manual downloads at all.
+API), so a hosted review round needs no manual downloads at all. The
+`pages` step also builds `fp_review.html` (the duplicate-claim check
+page) whenever `output/fp_candidates.csv` exists.
 
 The individual steps, for running by hand:
 
@@ -364,6 +419,41 @@ numbers, review flags, and its photo status — `Present` rows highlighted. A
 blank photo status means *not photographed yet*, which is **not** evidence a
 brick is missing until its section is photographed in full; the Summary sheet
 says so in words, because that distinction is the whole point of the count.
+
+A second workbook answers the warehouse-floor question — *what is actually
+stacked on this pallet?* — with one tab per pallet, rows in original-number
+order, both brick numbers, both buyer spellings, and the photo's own OCR
+read. It is built for printing and posting at each pallet:
+
+```powershell
+python make_pallet_report.py --matched output/pallets_final.csv \
+    --master reference/master_list.csv \
+    --output output/brick_report_by_pallet.xlsx
+```
+
+Pallet labels are warehouse labels, not park sections: most pallets are
+~90% one section but every one carries strays, so the Section column on
+each tab is the retrieval truth.
+
+## Where the pages live
+
+Three staff pages — `search.html`, `review.html`, `fp_review.html` — are
+hosted as plain static files behind one basic-auth login, next to the
+photo derivative trees (`thumbs/`, `zoom/`, `strips/` from
+`make_derivatives.py` / `make_strips.py`) and one small PHP script,
+`web/receiver.php`, which stores reviewers' autosaved decisions. Any
+static host with PHP works; `web/DEPLOY_DREAMHOST.md` is the complete
+recipe (subdomain, basic auth, token, upload, pulling decisions back).
+
+The **public** page is a separate build of the same search page
+(`make_search_page.py --public`): visitor-facing help text, no nav bar,
+no token — safe to publish. It is committed as `docs/index.html` and
+served by GitHub Pages at https://codeforanchorage.org/bricks/ ;
+refreshing it is rebuild-then-commit. Photos are not in the repo (far
+too big), so `--photo-base-url` makes the public page hotlink the hosted
+derivative trees; omit it for a pure text-search build. Google Analytics
+(GA4) is injected on the `--public` build only — the staff pages carry
+no tracking.
 
 ## Manual browser checks (the JS the test suite can't run)
 
@@ -566,7 +656,14 @@ python resolve_tsp_rows.py --pdf "TSP Bricks ALL - OG List by Name - OCR.pdf" \
 
 `--section` does not apply to the by-name list (it has no section column).
 
-## Not yet implemented (planned)
+## Project status (August 2026)
 
-Equirectangular→nadir projection from raw `.insp` files · CV brick-edge
-detection for layouts the text-proximity grouping can't resolve.
+Photography is **complete**: every warehouse pallet (park sections A–K)
+has been shot, one photo per brick. Of ~11,500 brick photos, ~11,200
+matched an official brick automatically and ~10,600 of those are
+human-confirmed; a few hundred remain in the review queue. Every section
+has its `missing_<S>.csv` lost/broken candidate list. The public search
+page and the staff pages are live, and the Excel workbooks are the
+running deliverable to Parks & Recreation. Numbers shift as review
+rounds land — the CSVs in `output/` (not committed) are the source of
+truth.

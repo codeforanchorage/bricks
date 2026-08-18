@@ -76,6 +76,7 @@ _PAGE = r"""<!DOCTYPE html>
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#274156">
 <title>__PAGETITLE__</title>__GA__
 <style>
  body { font-family: system-ui, sans-serif; margin: 0; background: #f4f2ee;
@@ -139,12 +140,15 @@ _PAGE = r"""<!DOCTYPE html>
     ONLY when clicked. Tap opens the overlay (hover-zoom alone fails on
     the counter tablets); tap again or Escape closes. */
  #zoomstrip { position: fixed; inset: 0; z-index: 10; cursor: zoom-out;
-        background: rgba(20,28,36,.88); display: flex;
-        align-items: center; justify-content: center; }
+        background: rgba(20,28,36,.88); display: flex; overflow: auto;
+        overscroll-behavior: contain; }
+ /* margin auto, not flex centering: centered-overflow content clips its
+    leading edge; auto margins center small images and let big ones
+    scroll to every edge. */
  #zoomstrip img { background: #fff; padding: 10px 6px; border-radius: 4px;
-        box-sizing: border-box; }
+        box-sizing: border-box; margin: auto; }
  #zoomstrip img.wide { width: 97vw; max-width: none; }
- #zoomstrip img.fit { max-width: 97vw; max-height: 94vh;
+ #zoomstrip img.fit { max-width: 97vw; max-height: 94vh; max-height: 94dvh;
         object-fit: contain; }
  /* Phones: tighter frame, larger tap targets. The search input stays
     >=16px so iOS doesn't zoom the page on focus. */
@@ -153,6 +157,12 @@ _PAGE = r"""<!DOCTYPE html>
    header h1 { font-size: 17px; }
    #wrap { padding: 10px 10px 40px; }
    #q { font-size: 18px; padding: 10px 12px; margin-top: 10px; }
+   /* Placeholder only -- the input itself must stay >=16px (iOS zoom
+      keys off the input's font-size, not the placeholder's). */
+   #q::placeholder { font-size: 15px; }
+   /* Magnified scan strip: 97vw at phone width is barely bigger than
+      the panel thumb. Keep it at readable width and pan sideways. */
+   #zoomstrip img.wide { width: 1400px; }
    .card { padding: 10px 12px; }
    .insc { font-size: 16.5px; }
    .badge { font-size: 14px; padding: 3px 10px; }
@@ -169,7 +179,7 @@ __NAVCSS__</style>
 </header>
 <div id="wrap">
 __INTRO__
-<input id="q" placeholder="Type a name, words from the brick, or a brick number&hellip;" autofocus autocomplete="off">
+<input id="q" placeholder="Type a name, words from the brick, or a brick number&hellip;"__AUTOFOCUS__ autocomplete="off">
 <div id="meta"></div>
 <div id="nextstep" style="display:none">__NEXTSTEP__</div>
 __HELP__
@@ -386,8 +396,15 @@ function magnify(src, cls) {
   big.className = cls;
   big.src = src;
   ov.appendChild(big);
-  ov.onclick = () => ov.remove();
+  ov.onclick = () => closeZoom();
+  // Lock the page scroll while zoomed: a touch-drag on the overlay was
+  // scrolling the results underneath, losing the user's place.
+  document.body.style.overflow = "hidden";
   document.body.appendChild(ov);
+}
+function closeZoom() {
+  const ov = document.getElementById("zoomstrip");
+  if (ov) { ov.remove(); document.body.style.overflow = ""; }
 }
 function magnifyStrip(img) { magnify(img.src, "wide"); }
 function magnifyPhoto(rel) {
@@ -491,8 +508,7 @@ document.getElementById("q").addEventListener("input", () => {
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") {
     // A magnified strip swallows the first Escape; search clears on the next.
-    const ov = document.getElementById("zoomstrip");
-    if (ov) { ov.remove(); return; }
+    if (document.getElementById("zoomstrip")) { closeZoom(); return; }
     const box = document.getElementById("q");
     box.value = ""; box.focus(); run();
   }
@@ -888,6 +904,11 @@ def main(argv=None) -> None:
             .replace("__NAVCSS__", "" if args.public else NAV_CSS)
             .replace("__NAV__", "" if args.public else nav_html("search.html"))
             .replace("__PAGETITLE__", title)
+            # Public build: no autofocus -- Android pops the keyboard on
+            # load and covers the orient-first intro (iOS ignores it, so
+            # desktop testing never showed it). Staff keep it: the
+            # counter workflow is type-immediately.
+            .replace("__AUTOFOCUS__", "" if args.public else " autofocus")
             .replace("__INTRO__", _INTRO_PUBLIC if args.public else "")
             .replace("__NEXTSTEP__",
                      _NEXTSTEP_PUBLIC if args.public else "")

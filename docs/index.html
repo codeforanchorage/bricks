@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#274156">
 <title>Anchorage Town Square Brick Search</title>
 <script async src="https://www.googletagmanager.com/gtag/js?id=G-NXMTEL5HGQ"></script>
 <script>window.dataLayer = window.dataLayer || [];function gtag(){dataLayer.push(arguments);}gtag('js', new Date());gtag('config', 'G-NXMTEL5HGQ');</script>
@@ -68,12 +69,15 @@
     ONLY when clicked. Tap opens the overlay (hover-zoom alone fails on
     the counter tablets); tap again or Escape closes. */
  #zoomstrip { position: fixed; inset: 0; z-index: 10; cursor: zoom-out;
-        background: rgba(20,28,36,.88); display: flex;
-        align-items: center; justify-content: center; }
+        background: rgba(20,28,36,.88); display: flex; overflow: auto;
+        overscroll-behavior: contain; }
+ /* margin auto, not flex centering: centered-overflow content clips its
+    leading edge; auto margins center small images and let big ones
+    scroll to every edge. */
  #zoomstrip img { background: #fff; padding: 10px 6px; border-radius: 4px;
-        box-sizing: border-box; }
+        box-sizing: border-box; margin: auto; }
  #zoomstrip img.wide { width: 97vw; max-width: none; }
- #zoomstrip img.fit { max-width: 97vw; max-height: 94vh;
+ #zoomstrip img.fit { max-width: 97vw; max-height: 94vh; max-height: 94dvh;
         object-fit: contain; }
  /* Phones: tighter frame, larger tap targets. The search input stays
     >=16px so iOS doesn't zoom the page on focus. */
@@ -82,6 +86,12 @@
    header h1 { font-size: 17px; }
    #wrap { padding: 10px 10px 40px; }
    #q { font-size: 18px; padding: 10px 12px; margin-top: 10px; }
+   /* Placeholder only -- the input itself must stay >=16px (iOS zoom
+      keys off the input's font-size, not the placeholder's). */
+   #q::placeholder { font-size: 15px; }
+   /* Magnified scan strip: 97vw at phone width is barely bigger than
+      the panel thumb. Keep it at readable width and pan sideways. */
+   #zoomstrip img.wide { width: 1400px; }
    .card { padding: 10px 12px; }
    .insc { font-size: 16.5px; }
    .badge { font-size: 14px; padding: 3px 10px; }
@@ -108,7 +118,7 @@
  <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">official
  pickup page</a>)</p>
 </div>
-<input id="q" placeholder="Type a name, words from the brick, or a brick number&hellip;" autofocus autocomplete="off">
+<input id="q" placeholder="Type a name, words from the brick, or a brick number&hellip;" autocomplete="off">
 <div id="meta"></div>
 <div id="nextstep" style="display:none">&#9989; <b>Found your brick?</b> Note its
  <span class="orignum">original #</span> and gold pallet badge, then
@@ -246,7 +256,7 @@
       email
       <a href="mailto:parkvolunteers@anchorageak.gov">parkvolunteers@anchorageak.gov</a>.</li>
  </ul>
- <p class="buildnote">Data updated 2026-08-13: 13,389 bricks searchable · 10,569 confirmed at the pickup site · 11 unofficial (at the site but missing from the official lists).</p>
+ <p class="buildnote">Data updated 2026-08-17: 13,389 bricks searchable · 10,569 confirmed at the pickup site · 11 unofficial (at the site but missing from the official lists).</p>
 </details>
 <div id="out"></div>
 </div>
@@ -461,8 +471,15 @@ function magnify(src, cls) {
   big.className = cls;
   big.src = src;
   ov.appendChild(big);
-  ov.onclick = () => ov.remove();
+  ov.onclick = () => closeZoom();
+  // Lock the page scroll while zoomed: a touch-drag on the overlay was
+  // scrolling the results underneath, losing the user's place.
+  document.body.style.overflow = "hidden";
   document.body.appendChild(ov);
+}
+function closeZoom() {
+  const ov = document.getElementById("zoomstrip");
+  if (ov) { ov.remove(); document.body.style.overflow = ""; }
 }
 function magnifyStrip(img) { magnify(img.src, "wide"); }
 function magnifyPhoto(rel) {
@@ -566,8 +583,7 @@ document.getElementById("q").addEventListener("input", () => {
 document.addEventListener("keydown", e => {
   if (e.key === "Escape") {
     // A magnified strip swallows the first Escape; search clears on the next.
-    const ov = document.getElementById("zoomstrip");
-    if (ov) { ov.remove(); return; }
+    if (document.getElementById("zoomstrip")) { closeZoom(); return; }
     const box = document.getElementById("q");
     box.value = ""; box.focus(); run();
   }

@@ -585,7 +585,7 @@ _HELP_STAFF = r"""<details>
  </ol>
 </details>"""
 
-_HELP_PUBLIC = r"""<details>
+_HELP_PUBLIC = r"""<details open>
  <summary>About this search - a Code for Anchorage volunteer
  project</summary>
  <p><b>This is a volunteer project of

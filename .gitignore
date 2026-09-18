@@ -43,3 +43,7 @@ test_strip.jpg
 # TownSquareBricks.aspx; the parsed CSVs are committed)
 reference/*.pdf
 *.pdf
+
+# Dated list backups written by adopt_buyers.py / adopt_inscriptions.py /
+# refile_strips.py before they rewrite reference/tsp_brick_list_v2.csv.
+reference/*.csv.bak*

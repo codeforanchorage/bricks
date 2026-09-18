@@ -20,9 +20,12 @@ every move is written to a map CSV that --revert replays backwards.
     python refile_strips.py --verdicts output/strip_recheck_verdicts.csv
 
 A strip whose target number is held by a strip confirmed CORRECT is dropped
-(moved to strips/_misfiled/) rather than overwriting it: no strip is better
-than a wrong one. Re-upload the tree afterwards -- the review page reads
-strips by brick number.
+(moved to ../strips_misfiled/) rather than overwriting it: no strip is
+better than a wrong one. The holding folder sits BESIDE the strips tree,
+never inside it -- anything inside gets swept up when the tree is synced to
+the web host (2026-09-18: a WinSCP sync published 530 wrong-row images
+because the holding folders were subdirectories). Re-sync the tree
+afterwards -- the review page reads strips by brick number.
 """
 from __future__ import annotations
 
@@ -52,7 +55,7 @@ def main(argv=None) -> None:
         for m in reversed(moves):
             src, dst = a.strips / m["to"], a.strips / m["from"]
             if m["kind"] == "dropped":
-                src = a.strips / "_misfiled" / m["to"]
+                src = a.strips.parent / (a.strips.name + "_misfiled") / m["to"]
             if src.exists():
                 src.rename(dst)
         print(f"reverted {len(moves)} move(s)")
@@ -106,7 +109,7 @@ def main(argv=None) -> None:
     # Dropped strips vacate their numbers FIRST: a dropped source still
     # sitting on disk owns a number some rename needs (Windows rename
     # refuses an existing target).
-    out = a.strips / "_misfiled"
+    out = a.strips.parent / (a.strips.name + "_misfiled")
     if dropped:
         out.mkdir(exist_ok=True)
     aside_names = {}

@@ -375,6 +375,10 @@ function idLine(r) {
 const PHOTO_BASE = "https://brendanbabb.com/bricks/photos";  // relative default: works hosted next
                                      // to the trees, hides offline; absolute
                                      // on GitHub Pages (Dreamhost hotlinks)
+// Strip images change content at an unchanged URL when they are re-filed,
+// and the photo tree is served with a 30-day Cache-Control -- so the URL
+// carries a version (hostpaths.STRIP_VERSION) to force a fresh fetch.
+const STRIP_V = "20260918";
 
 function card(row, idx) {
   if (row.u) {
@@ -442,7 +446,7 @@ function togglePanel(button, idx) {
          esc(p[3] || "-") + "</div>";
   }
   h += '<img class="striprow" loading="lazy" src="' + PHOTO_BASE +
-       '/strips/' + encodeURIComponent(r[0]) + '.jpg" ' +
+       '/strips/' + encodeURIComponent(r[0]) + '.jpg?v=' + STRIP_V + '" ' +
        'onclick="magnifyStrip(this)" ' +
        'onerror="this.style.display=\'none\'">' +
        '<div class="cap">&#128269; <b>Click to magnify</b> &middot; the ' +

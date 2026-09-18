@@ -58,7 +58,7 @@ from datetime import date
 from pathlib import Path
 
 from consensus import _CONFUSABLE, _STOPWORDS, _normalise, _similar
-from hostpaths import derivative_rel
+from hostpaths import STRIP_VERSION, derivative_rel
 from pagenav import NAV_CSS, nav_html
 
 # Row layout baked into the page (arrays, not objects: ~40% smaller).
@@ -313,6 +313,10 @@ function idLine(r) {
 const PHOTO_BASE = "__PHOTOBASE__";  // relative default: works hosted next
                                      // to the trees, hides offline; absolute
                                      // on GitHub Pages (Dreamhost hotlinks)
+// Strip images change content at an unchanged URL when they are re-filed,
+// and the photo tree is served with a 30-day Cache-Control -- so the URL
+// carries a version (hostpaths.STRIP_VERSION) to force a fresh fetch.
+const STRIP_V = "__STRIPV__";
 
 function card(row, idx) {
   if (row.u) {
@@ -380,7 +384,7 @@ function togglePanel(button, idx) {
          esc(p[3] || "-") + "</div>";
   }
   h += '<img class="striprow" loading="lazy" src="' + PHOTO_BASE +
-       '/strips/' + encodeURIComponent(r[0]) + '.jpg" ' +
+       '/strips/' + encodeURIComponent(r[0]) + '.jpg?v=' + STRIP_V + '" ' +
        'onclick="magnifyStrip(this)" ' +
        'onerror="this.style.display=\'none\'">' +
        '<div class="cap">&#128269; <b>Click to magnify</b> &middot; the ' +
@@ -902,6 +906,7 @@ def main(argv=None) -> None:
             .replace("__HELP__", help_html)
             .replace("__SHOWPHOTOS__", "true" if show_photos else "false")
             .replace("__PHOTOBASE__", photo_base)
+            .replace("__STRIPV__", STRIP_VERSION)
             .replace("__STAMP__", stamp)
             .replace("__DATA__", _json(rows))
             .replace("__PHOTOS__", _json(photos))

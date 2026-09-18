@@ -55,7 +55,7 @@ from datetime import date
 from pathlib import Path
 from urllib.parse import quote
 
-from hostpaths import derivative_url
+from hostpaths import derivative_url, strip_url
 from pagenav import NAV_CSS, nav_html
 
 THUMB_WIDTH = 640      # px; ~40-90 KB/photo -> a few hundred fit in one file
@@ -398,7 +398,7 @@ def _candidate_choices(group: str, candidates: list[dict], is_stack: bool,
             # The actual printed row from the scanned list; a missing
             # strip (colliding number, preamble row) hides itself.
             label += (f'<img class="strip" loading="lazy" '
-                      f'src="{hosted_base}/strips/{quote(orig)}.jpg" '
+                      f'src="{strip_url(hosted_base, orig)}" '
                       f'alt="scanned list row #{html.escape(orig)}" '
                       f'onerror="this.style.display=\'none\'">')
         choices.append(_radio(

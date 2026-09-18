@@ -9,6 +9,7 @@ import apply_decisions
 import make_report
 import make_review_page
 
+from hostpaths import strip_url
 from match import MATCH_COLUMNS as MATCH_COLS
 from match import REVIEW_COLUMNS as REVIEW_COLS
 
@@ -140,8 +141,12 @@ def test_review_page_shows_scanned_row_strips(tmp_path):
                            "--photo-base-url", "https://x.test/photos",
                            "--master", str(master)])
     page = out.read_text(encoding="utf-8")
-    # Strip named by ORIGINAL number, not the candidate's assigned id.
-    assert 'src="https://x.test/photos/strips/3770.jpg"' in page
+    # Strip named by ORIGINAL number, not the candidate's assigned id, and
+    # cache-busted: re-filing changes a strip's content at an unchanged URL
+    # while the photo tree is served with a 30-day Cache-Control, so the
+    # version from hostpaths rides along (see refile_strips.py).
+    assert f'src="{strip_url("https://x.test/photos", "3770")}"' in page
+    assert "/strips/3770.jpg?v=" in page
     assert "onerror" in page          # missing strips hide themselves
 
     # Without --master: no strip references at all.

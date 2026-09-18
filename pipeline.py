@@ -66,6 +66,12 @@ METHODS = {
                           "google", "gemini-3.1-flash-lite"),
     "gemini-lite-35":    ("gemini-lite-35", "Gemini 3.5 Flash-Lite",
                           "google", "gemini-3.5-flash-lite"),
+    # Premium pair added 2026-09-17 for the skidoo missing-brick hunt
+    # (second-opinion reads on unresolved photos; not for bulk runs).
+    "opus-5":            ("claude-opus-5", "Claude Opus 5",
+                          "anthropic", "claude-opus-5"),
+    "gemini-pro-31":     ("gemini-pro-31", "Gemini 3.1 Pro Preview",
+                          "google", "gemini-3.1-pro-preview"),
 }
 
 

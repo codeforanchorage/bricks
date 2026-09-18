@@ -30,6 +30,14 @@ PROMPT = ("This image is one row cut from a printed list: surname, first "
           "name, a brick number of 1 to 5 digits, then the inscription. "
           "Reply with ONLY the brick number digits, nothing else. If no "
           "number is visible reply NONE.")
+# --text mode: the number alone over-flags (a number inside the inscription,
+# or a clipped number column, reads as a mismatch on a correctly-filed
+# strip). Transcribing the whole row lets the caller check the NAME against
+# the row it is filed under, which is what settles a misfile.
+PROMPT_FULL = ("This image is one row cut from a printed list: surname, "
+               "first name, a brick number of 1 to 5 digits, then the "
+               "inscription. Transcribe the whole row verbatim on one "
+               "line. Reply with only the transcription.")
 DEFAULT_MODEL = "gemini-2.5-flash-lite"   # cheapest vision model; digits only
 _client = None
 _lock = threading.Lock()
@@ -44,13 +52,16 @@ def _get_client():
     return _client
 
 
-def read_number(path: Path, model: str = DEFAULT_MODEL) -> str:
+def read_number(path: Path, model: str = DEFAULT_MODEL,
+                full: bool = False) -> str:
     from google.genai import types
     part = types.Part.from_bytes(data=path.read_bytes(), mime_type="image/jpeg")
     for attempt in range(3):
         try:
             r = _get_client().models.generate_content(
-                model=model, contents=[part, PROMPT])
+                model=model, contents=[part, PROMPT_FULL if full else PROMPT])
+            if full:
+                return " ".join((r.text or "").split())[:300] or "NONE"
             m = re.search(r"\d{1,5}", r.text or "")
             return m.group(0) if m else "NONE"
         except Exception as exc:  # noqa: BLE001
@@ -69,6 +80,11 @@ def main(argv=None) -> None:
     p.add_argument("--workers", type=int, default=8)
     p.add_argument("--limit", type=int, default=0)
     p.add_argument("--model", default=DEFAULT_MODEL)
+    p.add_argument("--text", action="store_true",
+                   help="transcribe the whole row instead of just the "
+                        "number (settles misfiles by NAME)")
+    p.add_argument("--only", type=Path,
+                   help="CSV with a strip_file column: audit just those")
     a = p.parse_args(argv)
 
     done = {}
@@ -82,6 +98,10 @@ def main(argv=None) -> None:
             if file not in done and not printed.startswith("ERROR"):
                 done[file] = {"file": file, "printed": printed, "match": ok}
     strips = sorted(a.strips.glob("*.jpg"), key=lambda q: int(q.stem))
+    if a.only:
+        want = {r["strip_file"] for r in
+                csv.DictReader(open(a.only, newline="", encoding="utf-8"))}
+        strips = [s for s in strips if s.stem in want]
     todo = [s for s in strips if s.stem not in done]
     if a.limit:
         todo = todo[:a.limit]
@@ -90,12 +110,15 @@ def main(argv=None) -> None:
     log = a.output.with_suffix(".log.csv")      # append-only progress log
     with ThreadPoolExecutor(a.workers) as ex,             open(log, "a", newline="", encoding="utf-8") as lf:
         lw = csv.writer(lf)
-        futs = {ex.submit(read_number, s, a.model): s for s in todo}
+        futs = {ex.submit(read_number, s, a.model, a.text): s for s in todo}
         for i, f in enumerate(as_completed(futs), 1):
             s = futs[f]
             printed = f.result()
-            ok = ("" if printed.startswith("ERROR") or printed == "NONE"
-                  else str(int(printed) == int(s.stem)))
+            if a.text:
+                ok = ""
+            else:
+                ok = ("" if printed.startswith("ERROR") or printed == "NONE"
+                      else str(int(printed) == int(s.stem)))
             done[s.stem] = {"file": s.stem, "printed": printed, "match": ok}
             lw.writerow([s.stem, printed, ok]); lf.flush()
             if i % 500 == 0:

@@ -78,6 +78,9 @@ _PAGE = r"""<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="theme-color" content="#274156">
 <title>__PAGETITLE__</title>__GA__
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap">
 <style>
  body { font-family: system-ui, sans-serif; margin: 0; background: #f4f2ee;
         color: #1d2733; }
@@ -106,11 +109,14 @@ _PAGE = r"""<!DOCTYPE html>
           font-size: 15px; font-weight: 700; margin: 0 8px 4px 0; }
  .badge.sec { background: #274156; color: #fff; }
  .badge.pal { background: #ffd966; color: #4a3a00; }
- /* Section/pallet letters render in a serif face: sans-serif I is a
-    bare bar, unreadable next to 1 and l (sections run A-K, and pallet
-    I exists). Serifs give I its crossbars. */
- .lt { font-family: Georgia, "Times New Roman", serif; font-size: 108%;
-       letter-spacing: .5px; }
+ /* Section/pallet letters render in Atkinson Hyperlegible (Braille
+    Institute): a plain sans-serif I is a bare bar, unreadable next to
+    1 and l (sections run A-K, and pallet I exists). Atkinson gives I
+    crossbars, l a tail and 1 a flag. Georgia (serifed I) is the
+    fallback when the web font can't load, e.g. offline. */
+ .badge, .lt { font-family: "Atkinson Hyperlegible", Georgia,
+               "Times New Roman", serif; }
+ .lt { font-size: 112%; letter-spacing: .5px; }
  .insc { font-size: 18px; font-weight: 600; }
  .sub { color: #555; font-size: 14px; margin-top: 4px; }
  .chip { display: inline-block; border-radius: 12px; padding: 2px 10px;
@@ -280,18 +286,19 @@ function chips(r) {
   return h;
 }
 
-// Section (official list) + the folder the photo came from (the pallet
-// it is stacked on) -- the two facts a searcher acts on, so they lead
-// the card as badges instead of hiding in the detail line.
+// The folder the photo came from (the pallet it is stacked on) + the
+// section (official list) -- the two facts a searcher acts on, so they
+// lead the card as badges instead of hiding in the detail line. Pallet
+// comes first: it is where the visitor walks to at the pickup site.
 function locBadges(sec, pallet) {
   let h = "";
-  if (sec) h += '<span class="badge sec">Park section <span class="lt">' +
-                esc(sec.toUpperCase()) + "</span></span>";
   // Folder names already start with the word Pallet ("Pallet H3").
   if (pallet) h += '<span class="badge pal">Pickup pallet ' +
                    '<span class="lt">' +
                    esc(String(pallet).replace(/^pallet\s+/i, "")) +
                    "</span></span>";
+  if (sec) h += '<span class="badge sec">Park section <span class="lt">' +
+                esc(sec.toUpperCase()) + "</span></span>";
   return h ? '<div class="loc">' + h + "</div>" : "";
 }
 
@@ -535,12 +542,12 @@ _HELP_STAFF = r"""<details>
       - it is <span class="orignum">highlighted</span> on each
       result because the paper lists at the pickup site are sorted by
       it.</li>
-  <li><b>Read the visitor the result:</b> the dark
-      <span class="badge sec">Park section</span> badge is where the
-      brick was in the park (the official list's section); the gold
+  <li><b>Read the visitor the result:</b> the gold
       <span class="badge pal">Pickup pallet</span> badge is the folder
       its photo came from - the pallet it is stacked on at the
-      pickup site.
+      pickup site; the dark
+      <span class="badge sec">Park section</span> badge is where the
+      brick was in the park (the official list's section).
       An <span class="chip photo">at pickup site</span> chip means the
       brick was photographed there - it made the move from Town
       Square. Every pallet has now been photographed, so
@@ -650,10 +657,10 @@ _HELP_PUBLIC = r"""<details open>
       <span class="orignum">highlighted</span> on each result.</li>
   <li><b>Badges in the results:</b>
    <ul>
-    <li>Dark <span class="badge sec">Park section</span> badge =
-        where the brick was in Town Square.</li>
     <li>Gold <span class="badge pal">Pickup pallet</span> badge =
         which pallet it is on now.</li>
+    <li>Dark <span class="badge sec">Park section</span> badge =
+        where the brick was in Town Square.</li>
     <li><span class="chip photo">at pickup site</span> chip = the
         brick was photographed and is on that pallet.</li>
    </ul></li>__PUBVERIFY__

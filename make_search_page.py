@@ -202,7 +202,7 @@ __HELP__
 "use strict";
 const SHOW_PHOTOS = __SHOWPHOTOS__;  // false on the public no-photo build
 const DATA = __DATA__;          // [orig,new,section,moved,status,buyer,og,newi,flag,extra]
-const PHOTOS = __PHOTOS__;      // "SECTION|id" -> [pallet,image,extra,read,note]
+const PHOTOS = __PHOTOS__;      // "SECTION|id" -> [pallet,image,extra,read,note,others]
 const UNOFFICIAL = __UNOFFICIAL__;  // [image,pallet,read,note] no_match photos
 const SCAN = __SCAN__;          // scan-OCR confusable fold map (from consensus.py)
 const STOP = new Set(__STOP__); // boilerplate words dropped from match keys
@@ -210,8 +210,19 @@ const STOP = new Set(__STOP__); // boilerplate words dropped from match keys
 // "pallet" tag is this folder name, and every pallet-worded label below
 // swaps to City Hall wording for them.
 const CITY_HALL = __CITYHALL__;
-const CITY_HALL_NOTE = '<div class="sub chnote"><b>This brick is at City ' +
-    'Hall, not the main pick-up site.</b> Pick it up at City Hall, ' +
+// Every place a brick was photographed: [[pallet, image, read], ...].
+// Usually one; two or more when copies of the same inscription exist.
+function locsOf(p) {
+  return p ? [[p[0], p[1], p[3]]].concat(p[5] || []) : [];
+}
+function cityHallNote(alsoElsewhere) {
+  return CITY_HALL_NOTE.replace("__LEAD__", alsoElsewhere
+      ? "A copy of this brick is at City Hall as well as at the main " +
+        "pick-up site."
+      : "This brick is at City Hall, not the main pick-up site.");
+}
+const CITY_HALL_NOTE = '<div class="sub chnote"><b>__LEAD__</b> ' +
+    'Pick it up at City Hall, ' +
     'Suite 630, Monday&ndash;Friday 9 a.m. to 3 p.m., through October 9, ' +
     '2026 - see &ldquo;City Hall Bricks ONLY&rdquo; in the help below.</div>';
 function siteChip(pallet) {
@@ -302,7 +313,9 @@ function chips(r) {
   else if (status === "no_brick") h += '<span class="chip gray">no brick made</span>';
   else h += '<span class="chip warn">needs verification</span>';
   const p = PHOTOS[key];
-  if (p) h += siteChip(p[0]);
+  const pals = locsOf(p).map(l => l[0]);
+  if (pals.some(x => x !== CITY_HALL)) h += siteChip("");
+  if (pals.includes(CITY_HALL)) h += siteChip(CITY_HALL);
   return h;
 }
 
@@ -310,16 +323,18 @@ function chips(r) {
 // section (official list) -- the two facts a searcher acts on, so they
 // lead the card as badges instead of hiding in the detail line. Pallet
 // comes first: it is where the visitor walks to at the pickup site.
-function locBadges(sec, pallet) {
+function locBadges(sec, pallets) {
   let h = "";
+  for (const pallet of [].concat(pallets || []).filter(Boolean)) {
   if (pallet === CITY_HALL)
     h += '<span class="badge pal">Pick up at <span class="lt">' +
          "City Hall</span></span>";
   // Folder names already start with the word Pallet ("Pallet H3").
-  else if (pallet) h += '<span class="badge pal">Pickup pallet ' +
+  else h += '<span class="badge pal">Pickup pallet ' +
                    '<span class="lt">' +
                    esc(String(pallet).replace(/^pallet\s+/i, "")) +
                    "</span></span>";
+  }
   if (sec) h += '<span class="badge sec">Park section <span class="lt">' +
                 esc(sec.toUpperCase()) + "</span></span>";
   return h ? '<div class="loc">' + h + "</div>" : "";
@@ -363,7 +378,7 @@ function card(row, idx) {
            '<div class="sub">Confirmed by a reviewer as present but ' +
            "absent from the lists" +
            (note ? " &middot; note: " + esc(note) : "") + "</div>" +
-           (pallet === CITY_HALL ? CITY_HALL_NOTE : "") + "</div>";
+           (pallet === CITY_HALL ? cityHallNote(false) : "") + "</div>";
   }
   const r = row.r;
   // Display preference: clean digital text (renovation workbook) > the matched
@@ -377,11 +392,13 @@ function card(row, idx) {
       'onclick="togglePanel(this,' + idx + ')">show me a picture of the ' +
       'brick &#128247;</button>' : "";
   return '<div class="card" data-idx="' + idx + '">' +
-         locBadges(r[2], p ? p[0] : "") +
+         locBadges(r[2], locsOf(p).map(l => l[0])) +
          '<div class="insc">' + esc(insc) + "</div>" +
          '<div class="sub">' + chips(r) + verify + "</div>" +
          '<div class="sub">' + buyer + idLine(r) + "</div>" +
-         (p && p[0] === CITY_HALL ? CITY_HALL_NOTE : "") + "</div>";
+         (locsOf(p).some(l => l[0] === CITY_HALL)
+            ? cityHallNote(locsOf(p).some(l => l[0] !== CITY_HALL)) : "") +
+         "</div>";
 }
 
 let lastHits = [];
@@ -406,14 +423,21 @@ function togglePanel(button, idx) {
   const r = hit.r;
   const p = PHOTOS[r[2].toUpperCase() + "|" + (r[1] || r[0])];
   let h = "";
-  if (p && p[1]) {
-    const rel = encodeURI(p[1]).replace(/'/g, "%27");
+  const locs = locsOf(p).filter(l => l[1]);
+  for (const [pallet, image, read] of locs) {
+    const rel = encodeURI(image).replace(/'/g, "%27");
+    // With copies in several places, say which photo is where.
+    const where = locs.length > 1
+        ? "<b>" + (pallet === CITY_HALL ? "At City Hall"
+            : "Pallet " + esc(String(pallet).replace(/^pallet\s+/i, ""))) +
+          "</b> &middot; " : "";
     h += '<img class="photo" loading="lazy" src="' + PHOTO_BASE +
          '/thumbs/' + rel + '" onclick="magnifyPhoto(\'' + rel + '\')" ' +
          'onerror="this.style.display=\'none\'">' +
-         '<div class="cap">&#128269; <b>Click the photo to enlarge it</b> ' +
+         '<div class="cap">' + where +
+         '&#128269; <b>Click the photo to enlarge it</b> ' +
          '&middot; what the computer read: ' +
-         esc(p[3] || "-") + "</div>";
+         esc(read || "-") + "</div>";
   }
   h += '<img class="striprow" loading="lazy" src="' + PHOTO_BASE +
        '/strips/' + encodeURIComponent(r[0]) + '.jpg?v=' + STRIP_V + '" ' +
@@ -837,7 +861,9 @@ def _load_photos(paths: list[Path]) -> tuple[dict[str, list], list[list]]:
 
     Returns (photos, unofficial):
       photos: (SECTION|official_id) -> [pallet, thumb-ready image,
-              extra_count, ocr_read, review_note]
+              extra_count, ocr_read, review_note, other_locations]
+              other_locations: [[pallet, image, ocr_read], ...] for
+              photos of the same brick taken at a different location
       unofficial: [[thumb-ready image, pallet, ocr_read, note], ...] for
               human-confirmed no_match photos -- bricks that physically
               exist at the pickup site but are absent from the official
@@ -858,11 +884,21 @@ def _load_photos(paths: list[Path]) -> tuple[dict[str, list], list[list]]:
                     key = (row.get("official_section", "").upper() + "|"
                            + row.get("official_id", ""))
                     if key in photos:
-                        photos[key][2] += 1
+                        entry = photos[key]
+                        entry[2] += 1
+                        # A second photo on a DIFFERENT pallet (or at City
+                        # Hall) is another physical copy of the brick --
+                        # some inscriptions exist twice -- so the card
+                        # shows every location, one photo each.
+                        pallet = row.get("pallet", "")
+                        if pallet and pallet != entry[0] and all(
+                                pallet != other[0] for other in entry[5]):
+                            entry[5].append(
+                                [pallet, jpg, row.get("matched_read", "")])
                     else:
                         photos[key] = [row.get("pallet", ""), jpg, 0,
                                        row.get("matched_read", ""),
-                                       row.get("review_note", "")]
+                                       row.get("review_note", ""), []]
                 elif status == "no_match" and jpg not in seen_unofficial:
                     seen_unofficial.add(jpg)
                     unofficial.append([jpg, row.get("pallet", ""),

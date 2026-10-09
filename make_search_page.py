@@ -206,9 +206,10 @@ const PHOTOS = __PHOTOS__;      // "SECTION|id" -> [pallet,image,extra,read,note
 const UNOFFICIAL = __UNOFFICIAL__;  // [image,pallet,read,note] no_match photos
 const SCAN = __SCAN__;          // scan-OCR confusable fold map (from consensus.py)
 const STOP = new Set(__STOP__); // boilerplate words dropped from match keys
-// Bricks photographed at City Hall are NOT on a warehouse pallet: their
-// "pallet" tag is this folder name, and every pallet-worded label below
-// swaps to City Hall wording for them.
+// Bricks photographed at City Hall (moved to the main pick-up site on
+// October 9) are NOT on a numbered warehouse pallet: their "pallet" tag
+// is this folder name, and every pallet-worded label below swaps to
+// "from City Hall" wording for them.
 const CITY_HALL = __CITYHALL__;
 // Every place a brick was photographed: [[pallet, image, read], ...].
 // Usually one; two or more when copies of the same inscription exist.
@@ -217,18 +218,17 @@ function locsOf(p) {
 }
 function cityHallNote(alsoElsewhere) {
   return CITY_HALL_NOTE.replace("__LEAD__", alsoElsewhere
-      ? "A copy of this brick is at City Hall as well as at the main " +
-        "pick-up site."
-      : "This brick is at City Hall, not the main pick-up site.");
+      ? "One copy of this brick was held at City Hall; another is on the " +
+        "pallet shown above."
+      : "This brick was held at City Hall.");
 }
 const CITY_HALL_NOTE = '<div class="sub chnote"><b>__LEAD__</b> ' +
-    'Pick it up at City Hall, ' +
-    'Suite 630, Monday&ndash;Friday 9 a.m. to 3 p.m., through October 9, ' +
-    '2026 - see &ldquo;City Hall Bricks ONLY&rdquo; in the help below.</div>';
-function siteChip(pallet) {
-  return '<span class="chip photo">' +
-         (pallet === CITY_HALL ? "at City Hall" : "at pickup site") +
-         "</span>";
+    'The City Hall bricks were moved to the main pick-up site on ' +
+    'October 9 and are not on a numbered pallet - ask staff on site ' +
+    'where they were placed. See &ldquo;City Hall bricks&rdquo; in the ' +
+    'help below.</div>';
+function siteChip() {
+  return '<span class="chip photo">at pickup site</span>';
 }
 
 function normalise(s) {
@@ -313,9 +313,9 @@ function chips(r) {
   else if (status === "no_brick") h += '<span class="chip gray">no brick made</span>';
   else h += '<span class="chip warn">needs verification</span>';
   const p = PHOTOS[key];
-  const pals = locsOf(p).map(l => l[0]);
-  if (pals.some(x => x !== CITY_HALL)) h += siteChip("");
-  if (pals.includes(CITY_HALL)) h += siteChip(CITY_HALL);
+  // Every photographed brick, City Hall ones included, is now at the
+  // main pick-up site.
+  if (locsOf(p).length) h += siteChip();
   return h;
 }
 
@@ -327,7 +327,7 @@ function locBadges(sec, pallets) {
   let h = "";
   for (const pallet of [].concat(pallets || []).filter(Boolean)) {
   if (pallet === CITY_HALL)
-    h += '<span class="badge pal">Pick up at <span class="lt">' +
+    h += '<span class="badge pal">From <span class="lt">' +
          "City Hall</span></span>";
   // Folder names already start with the word Pallet ("Pallet H3").
   else h += '<span class="badge pal">Pickup pallet ' +
@@ -371,7 +371,7 @@ function card(row, idx) {
            '<div class="insc">' + esc(read || "(unreadable)") + "</div>" +
            '<div class="sub"><span class="chip warn">unofficial - ' +
            "not in official records</span>" +
-           siteChip(pallet) +
+           siteChip() +
            (SHOW_PHOTOS ? ' <button class="verify" onclick="togglePanel(this,' +
             idx + ')">show me a picture of the brick &#128247;</button>'
             : "") + "</div>" +
@@ -428,7 +428,7 @@ function togglePanel(button, idx) {
     const rel = encodeURI(image).replace(/'/g, "%27");
     // With copies in several places, say which photo is where.
     const where = locs.length > 1
-        ? "<b>" + (pallet === CITY_HALL ? "At City Hall"
+        ? "<b>" + (pallet === CITY_HALL ? "From City Hall"
             : "Pallet " + esc(String(pallet).replace(/^pallet\s+/i, ""))) +
           "</b> &middot; " : "";
     h += '<img class="photo" loading="lazy" src="' + PHOTO_BASE +
@@ -629,9 +629,8 @@ _HELP_STAFF = r"""<details>
       lists - they show what the brick reads and which pallet holds
       it. The photo is the record; the visitor can still claim it.</li>
   <li>__CITYHALLHELP__ Results for these bricks show a gold
-      <span class="badge pal">Pick up at City Hall</span> badge and an
-      <span class="chip photo">at City Hall</span> chip instead of a
-      pallet.</li>
+      <span class="badge pal">From City Hall</span> badge instead of a
+      pallet number.</li>
   <li><b>Not found at all?</b> Try fewer words, or just the surname. If it
       is genuinely absent, take contact info and add it to the follow-up
       list - photos are still being reviewed, so absence today is
@@ -716,9 +715,10 @@ _HELP_PUBLIC = r"""<details open>
         where the brick was in Town Square.</li>
     <li><span class="chip photo">at pickup site</span> chip = the
         brick was photographed and is on that pallet.</li>
-    <li>Gold <span class="badge pal">Pick up at City Hall</span> badge
-        = the brick is at City Hall, not on a pallet - see
-        &ldquo;City Hall Bricks ONLY&rdquo; below.</li>
+    <li>Gold <span class="badge pal">From City Hall</span> badge
+        = the brick was held at City Hall and is now at the pick-up
+        site, but not on a numbered pallet - see
+        &ldquo;City Hall bricks&rdquo; below.</li>
    </ul></li>__PUBVERIFY__
   <li><b>If not found:</b> try fewer words or just the last name. If
       still missing, check your section&rsquo;s
@@ -770,21 +770,15 @@ _HELP_PUBLIC = r"""<details open>
  <p class="buildnote">__BUILDNOTE__</p>
 </details>"""
 
-_CITY_HALL_HELP = r"""<b>City Hall Bricks ONLY</b>
- <p>The last day to pick up your City Hall brick(s) is October 9, 2026.
- Please don&rsquo;t wait. If you cannot come in person, you may send
- someone to pick up the brick(s) for you.</p>
- <p>They are available at City Hall, Suite 630, Monday&ndash;Friday
- (excluding Municipal holidays) from 9 a.m. to 3 p.m. Free parking is
- available during this time in the City Hall lot off 7th Avenue.</p>
- <p>The Parks and Recreation office is in Suite 630, immediately to
- your right as you exit the elevator on the 6th floor. Please bring a
- bag for your brick(s), as they may still have some residual dirt on
- them.</p>
- <p>After 3pm on October 9th, all City Hall bricks will be transferred
- to the main brick pick-up site. They can be picked up on the last
+_CITY_HALL_HELP = r"""<b>City Hall bricks</b>
+ <p>About 100 bricks were held at City Hall through October 9, 2026.
+ After 3pm on October 9th, all City Hall bricks were transferred to
+ the main brick pick-up site. They can be picked up on the last
  pick-up day, Saturday, October 10th, with the rest of the bricks at
- the main pick-up site from 10 am &ndash; 12 pm.</p>"""
+ the main pick-up site (2839 Mountain View Dr) from 10 am &ndash;
+ 12 pm. They are not on a numbered pallet - ask staff on site where
+ the City Hall bricks were placed. Please bring a bag for your
+ brick(s), as they may still have some residual dirt on them.</p>"""
 
 # The folder name (photos/pallets/City Hall/) that tags a photo as taken
 # at City Hall rather than on a warehouse pallet.
@@ -802,12 +796,12 @@ _INTRO_PUBLIC = r"""<div id="intro">
  update: over 60% of bricks still await their owners</a> &middot;
  <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">official
  pickup page</a>)</p>
- <p style="margin-top:8px"><b>About 100 bricks are at City Hall, not
- the main pick-up site.</b> Their search results show a gold
- <span class="badge pal">Pick up at City Hall</span> badge. Pick them
- up at City Hall, Suite 630, Monday&ndash;Friday 9 a.m. to 3 p.m.,
- through October 9, 2026 - details under &ldquo;City Hall Bricks
- ONLY&rdquo; below.</p>
+ <p style="margin-top:8px"><b>The bricks that were at City Hall have
+ moved to the main pick-up site</b> for the last pick-up day, Saturday
+ October 10. Their search results show a gold
+ <span class="badge pal">From City Hall</span> badge; they are not on a
+ numbered pallet, so ask staff on site - details under &ldquo;City
+ Hall bricks&rdquo; below.</p>
 </div>"""
 
 _NEXTSTEP_PUBLIC = r"""&#9989; <b>Found your brick?</b> Note its

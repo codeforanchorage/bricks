@@ -309,13 +309,18 @@ function esc(s) {
 function chips(r) {
   const status = r[4], sec = r[2], key = sec.toUpperCase() + "|" + (r[1] || r[0]);
   let h = "";
+  const p = PHOTOS[key];
+  const found = locsOf(p).length > 0;
   if (status === "ok") h += '<span class="chip ok">in the official records</span>';
   else if (status === "no_brick") h += '<span class="chip gray">no brick made</span>';
+  // An unjoined row (the two official lists never agreed on it) whose
+  // engraving was nonetheless read off a pallet photo: the brick is real
+  // and located, only its list row is unconfirmed.
+  else if (found) h += '<span class="chip warn">found by photo - list row unconfirmed</span>';
   else h += '<span class="chip warn">needs verification</span>';
-  const p = PHOTOS[key];
   // Every photographed brick, City Hall ones included, is now at the
   // main pick-up site.
-  if (locsOf(p).length) h += siteChip();
+  if (found) h += siteChip();
   return h;
 }
 
@@ -612,8 +617,14 @@ _HELP_STAFF = r"""<details>
       <span class="chip ok">in the official records</span> the brick is on
       the official brick lists;
       <span class="chip warn">needs verification</span> the two
-      official lists disagree about this row - take the visitor's name
-      and contact info for follow-up, do not promise the brick;
+      official lists disagree about this row and no photo matched it -
+      take the visitor's name and contact info for follow-up, do not
+      promise the brick;
+      <span class="chip warn">found by photo - list row unconfirmed</span>
+      the lists disagree about the row, but a pallet photo was matched to
+      its engraving - the brick is real and the gold badge says where it
+      is; open the picture to confirm the match before sending the
+      visitor to the pallet;
       <span class="chip gray">no brick made</span> the purchase is recorded
       but no brick was ever engraved.</li>
   <li><b>Checking a match before pickup:</b> the
@@ -690,9 +701,12 @@ _HELP_PUBLIC = r"""<details open>
         the official lists.</li>
     <li>It can still be claimed.</li>
    </ul></li>
-  <li><b><span class="chip warn">needs verification</span>:</b>
+  <li><b><span class="chip warn">found by photo - list row
+      unconfirmed</span>:</b>
    <ul>
-    <li>Two official lists disagree about this brick.</li>
+    <li>The two lists disagree about this brick, but a pallet photo
+        matched its engraving - the brick is there, and the gold badge
+        says which pallet. Check the picture to be sure it is yours.</li>
    </ul></li>
   <li><b><span class="chip gray">no brick made</span> the official
       list:</b>
@@ -959,6 +973,18 @@ def main(argv=None) -> None:
 
     rows = _load_master(args.master)
     photos, unofficial = _load_photos(args.matched)
+    if args.public:
+        # Visitors get nothing actionable from an unjoined row nobody
+        # photographed (no section, no pallet, no picture) -- it only
+        # reads as "needs verification" with no next step. Rows the
+        # matcher DID find on a pallet stay: they carry a badge and a
+        # photo. The staff page keeps every row.
+        before = len(rows)
+        rows = [r for r in rows
+                if r[4] != "unjoined"
+                or (r[2].upper() + "|" + (r[1] or r[0])) in photos]
+        print(f"Public build: hid {before - len(rows)} unjoined rows "
+              "without a photo")
 
     scan_map = {chr(k): v for k, v in _CONFUSABLE.items()}
     # Staff read the stamp to confirm they have the latest upload; the

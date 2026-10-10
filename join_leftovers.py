@@ -87,8 +87,26 @@ def _word_overlap(a: str, b: str) -> float:
 
 
 def _load_unjoined(path: Path) -> list[dict]:
+    """Unjoined rows, minus scan duplicates of a row that DID join.
+
+    The scanned list repeats some rows (dup_orig): same certificate number,
+    same buyer, same text. When one copy joined the workbook the other is
+    the same sale, not a second brick -- it must not be given a brick.
+    """
     with open(path, newline="", encoding="utf-8") as f:
-        return [r for r in csv.DictReader(f) if r["status"] == "unjoined"]
+        rows = list(csv.DictReader(f))
+    joined = {(r["orig_id"], r["buyer"], _key(r["og_alt"] or r["og_inscription"]))
+              for r in rows if r["status"] == "ok"}
+    out, dups = [], 0
+    for r in rows:
+        if r["status"] != "unjoined":
+            continue
+        if (r["orig_id"], r["buyer"], _key(r["og_alt"] or r["og_inscription"])) in joined:
+            dups += 1
+            continue
+        out.append(r)
+    print(f"skipped {dups} unjoined rows that duplicate a joined row")
+    return out
 
 
 def _load_unclaimed(path: Path, master: Path) -> list[dict]:
@@ -198,6 +216,13 @@ def main(argv=None) -> None:
         if (not photo_led and all(text_keys)
                 and _similar(text_keys[0], text_keys[1]) < PHOTO_TRUST):
             flags.append("og_texts_disagree")
+        # A text join carried by the parse alone, while the (usually
+        # cleaner, fuller) vision re-read scores poorly, rode a truncated
+        # or garbled parse: "G9D BIESS IAWRENCE" fits any Lawrence.
+        if (not photo_led and text_keys[1]
+                and _similar(text_keys[1], cand["_key"]) < RESCUE_MIN_SCORE
+                and _similar(text_keys[0], cand["_key"]) >= STRONG):
+            flags.append("parse_only")
         if margin < MARGIN:
             flags.append("low_margin")
         if best >= STRONG and not flags:

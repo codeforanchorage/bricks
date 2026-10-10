@@ -248,6 +248,10 @@ brick-ocr/
   rescan_rows.py       re-read troublesome scan rows with two current models;
                        adopt the new text only when both agree
   merge_lists.py       merge both lists into the master lookup table
+                       (reads reference/join_overrides.csv for decided joins)
+  join_leftovers.py    looser join of the unjoined by-name rows against the
+                       unclaimed workbook rows, photo reads as a 3rd witness;
+                       --write-overrides feeds the clean joins to merge_lists
   match.py             match the OCR catalogue against an official list
   make_review_page.py  pack the review queue into one offline review.html
                        (--receiver-url adds autosave-to-server;
@@ -566,9 +570,21 @@ corroboration; identical-copy batches are then assigned one-to-one, strongest
 join first, so a weak rescue can never displace a rightful 1.00 owner —
 contested bricks go to the best-scoring claimant and the loser drops to
 review). Current yield with the v2 OG list and
-the .xls source: 12,902 of 13,389 rows fully resolved, 468 flagged `unjoined`
+the .xls source: 13,040 of 13,389 rows fully resolved, 330 flagged `unjoined`
 for review, 19 sales recorded as "NO BRICK NO INSCRIPTION". By-area rows no OG
 row claimed land in `master_unclaimed.csv`.
+
+Joins the text matcher cannot make can be decided elsewhere and fed back
+through `reference/join_overrides.csv` (columns `orig_id, buyer, section,
+new_id, …`). `join_leftovers.py` fills it: it scores only the two leftover
+pools against each other -- small enough to score every pair -- and brings in
+the pallet photo's OCR read as a third witness for unjoined rows the photo
+matcher found on a pallet. Its candidate file
+(`output/unjoined_join_candidates.csv`) is tiered; only clean `strong`
+rows are written as overrides (68 on 2026-10-09), the rest are for a human.
+An override is applied only while its OG row is still unjoined and its
+workbook row still unclaimed, so a later reparse that joins the row on its
+own quietly supersedes it. Overridden rows carry the flag `join_override`.
 
 ```bash
 python merge_lists.py --og reference/tsp_brick_list_v2.csv \

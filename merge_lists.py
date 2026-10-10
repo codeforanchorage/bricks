@@ -203,6 +203,56 @@ def _surname_corroborates(buyer: str, candidate: dict) -> bool:
     return any(_similar(surname[0], w) >= RESCUE_SURNAME_SIM for w in words)
 
 
+OVERRIDES_DEFAULT = Path("reference/join_overrides.csv")
+OVERRIDE_COLUMNS = ["orig_id", "buyer", "section", "new_id",
+                    "new_inscription", "score", "witness", "source", "date"]
+
+
+def _apply_overrides(out_rows: list[dict], new_rows: list[dict],
+                     claimed: set, path: Path, counts: dict) -> None:
+    """Joins decided outside the text matcher (join_leftovers.py, humans).
+
+    Each override names an OG row (orig_id + buyer, which together
+    disambiguate the scan's duplicated numbers) and the workbook row it
+    is -- (section, new_id). It is applied only when the OG row is still
+    'unjoined' and the workbook row is still unclaimed, so a later
+    reparse that joins the row on its own, or hands the brick to a better
+    text match, silently wins over the stale override. Rows the file
+    could not apply are reported, not forced.
+    """
+    if not path.is_file():
+        return
+    with open(path, newline="", encoding="utf-8") as f:
+        overrides = list(csv.DictReader(f))
+    by_new = {(r["section"].upper(), r["assigned_id"]): r for r in new_rows}
+    unjoined = defaultdict(list)
+    for row in out_rows:
+        if row["status"] == "unjoined":
+            unjoined[(row["orig_id"], row["buyer"])].append(row)
+    for ov in overrides:
+        target = by_new.get((ov["section"].upper(), ov["new_id"]))
+        rows = unjoined.get((ov["orig_id"], ov["buyer"]), [])
+        if target is None or id(target) in claimed or not rows:
+            counts["override_skipped"] += 1
+            print(f"  override not applied: {ov['orig_id']} {ov['buyer']} -> "
+                  f"{ov['section']}-{ov['new_id']} ("
+                  + ("workbook row missing" if target is None else
+                     "workbook row already claimed" if id(target) in claimed
+                     else "OG row no longer unjoined") + ")")
+            continue
+        # Several unjoined copies of one (number, buyer): take the one
+        # whose text fits the workbook row best.
+        row = max(rows, key=lambda r: _similar(
+            _key(r["og_alt"] or r["og_inscription"]), target["_key"]))
+        row.update(new_id=target["assigned_id"], section=target["section"],
+                   new_inscription=target["full_name"], status="ok",
+                   join_score=ov.get("score", ""))
+        row["flag"] = ";".join(f for f in [row["flag"], "join_override"] if f)
+        claimed.add(id(target))
+        unjoined[(ov["orig_id"], ov["buyer"])].remove(row)
+        counts["override"] += 1
+
+
 def _spread_identical_copies(out_rows: list[dict], new_rows: list[dict],
                              claimed: set, counts: dict,
                              min_score: float = JOIN_MIN_SCORE) -> None:
@@ -275,6 +325,11 @@ def main(argv=None) -> None:
     parser.add_argument("--min-score", type=float, default=JOIN_MIN_SCORE,
                         help=f"Similarity to accept a text join "
                              f"(default: {JOIN_MIN_SCORE})")
+    parser.add_argument("--overrides", type=Path, default=OVERRIDES_DEFAULT,
+                        help="CSV of decided joins for rows the text match "
+                             "leaves unjoined (join_leftovers.py "
+                             f"--write-overrides); default {OVERRIDES_DEFAULT}, "
+                             "skipped when absent")
     args = parser.parse_args(argv)
 
     new_rows = _load_new(args.new)
@@ -366,6 +421,8 @@ def main(argv=None) -> None:
 
     _spread_identical_copies(out_rows, new_rows, claimed, counts,
                              args.min_score)
+    _apply_overrides(out_rows, new_rows, claimed, args.overrides, counts)
+    counts["unjoined"] -= counts["override"]
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     with open(args.output, "w", newline="", encoding="utf-8") as f:
@@ -385,6 +442,9 @@ def main(argv=None) -> None:
     print(f"\n  unmoved (E/F/G, section from number) : {counts['unmoved']}")
     print(f"  moved, joined by text                : {counts['joined']}")
     print(f"  moved, rescued (margin + surname)    : {counts['rescued']}")
+    if counts["override"] or counts["override_skipped"]:
+        print(f"  moved, joined by override file       : {counts['override']}"
+              f" ({counts['override_skipped']} not applicable)")
     print(f"  moved, no text match (review)        : {counts['unjoined']}"
           + (f" (incl. {counts['copy_overflow']} identical-copy overflow)"
              if counts["copy_overflow"] else ""))

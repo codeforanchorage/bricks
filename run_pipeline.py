@@ -178,7 +178,11 @@ def main(argv=None) -> None:
         # a reviewer's explicit export always beats a rolling autosave.
         pulled.sort(key=lambda p: (not p.name.startswith("autosave_"),
                                    p.stat().st_mtime))
-        decision_files = [str(p) for p in local + pulled]
+        # output/decisions_*override*.csv: deliberate reversals of pulled
+        # decisions (e.g. a 'mismatch' clicked off a misfiled strip). They
+        # must come LAST or the autosaves they overrule win again.
+        overrides = sorted(out.glob("decisions_*override*.csv"))
+        decision_files = [str(p) for p in local + pulled + overrides]
         if decision_files:
             apply_decisions.main(["--matched",
                                   str(out / "pallets_matched.csv"),

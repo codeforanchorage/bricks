@@ -57,8 +57,12 @@ def _new(section, assigned_id, full_name, key_word=""):
             "pos2": "", "full_name": full_name, "key_word": key_word}
 
 
-def _run_merge(tmp_path, og_rows, new_rows):
-    """Run merge_lists.main() on synthetic lists -> (master, rows, unclaimed)."""
+def _run_merge(tmp_path, og_rows, new_rows, overrides=None):
+    """Run merge_lists.main() on synthetic lists -> (master, rows, unclaimed).
+
+    overrides: rows for a join_overrides.csv; None = no override file (the
+    real reference/join_overrides.csv must never leak into these tests).
+    """
     og_path, new_path = tmp_path / "og.csv", tmp_path / "new.csv"
     for path, cols, rows in ((og_path, OG_COLS, og_rows),
                              (new_path, NEW_COLS, new_rows)):
@@ -66,9 +70,15 @@ def _run_merge(tmp_path, og_rows, new_rows):
             w = csv.DictWriter(f, fieldnames=cols)
             w.writeheader()
             w.writerows(rows)
+    ov_path = tmp_path / "join_overrides.csv"
+    if overrides is not None:
+        with open(ov_path, "w", newline="", encoding="utf-8") as f:
+            w = csv.DictWriter(f, fieldnames=merge_lists.OVERRIDE_COLUMNS)
+            w.writeheader()
+            w.writerows(overrides)
     out = tmp_path / "master.csv"
     merge_lists.main(["--og", str(og_path), "--new", str(new_path),
-                      "--output", str(out)])
+                      "--output", str(out), "--overrides", str(ov_path)])
     with open(out, newline="", encoding="utf-8") as f:
         rows = list(csv.DictReader(f))
     master = {r["orig_id"]: r for r in rows}   # dup ids: last row wins here
@@ -255,3 +265,44 @@ def test_wrongrow_alt_is_dropped_and_flagged(tmp_path):
     assert "alt_neighbor" in master["201"]["flag"]
     assert master["202"]["og_alt"] == "DOE FAMILY HOMESTEAD"
     assert "alt_neighbor" not in master["202"]["flag"]
+
+
+def _override(orig_id, buyer, section, new_id, **extra):
+    row = {c: "" for c in merge_lists.OVERRIDE_COLUMNS}
+    row.update(orig_id=orig_id, buyer=buyer, section=section, new_id=new_id,
+               score="0.90", witness="photo", source="test", **extra)
+    return row
+
+
+def test_override_joins_unjoined_row_to_unclaimed_brick(tmp_path):
+    """A decided join (join_leftovers / human) lands where text failed."""
+    og_rows = [_og("5002", "ZZQQ XXYY", "NOBODY"),
+               _og("5002", "TOTALLY OTHER", "SOMEONE")]   # dup number, other buyer
+    new_rows = [_new("C", "300", "UNCLAIMED BRICK TEXT", "NOONE")]
+    master, rows, unclaimed = _run_merge(
+        tmp_path, og_rows, new_rows,
+        overrides=[_override("5002", "NOBODY", "C", "300")])
+    joined = [r for r in rows if r["buyer"] == "NOBODY"][0]
+    other = [r for r in rows if r["buyer"] == "SOMEONE"][0]
+    assert joined["status"] == "ok"
+    assert (joined["section"], joined["new_id"]) == ("C", "300")
+    assert joined["new_inscription"] == "UNCLAIMED BRICK TEXT"
+    assert joined["join_score"] == "0.90"
+    assert "join_override" in joined["flag"].split(";")
+    assert other["status"] == "unjoined"        # buyer disambiguates
+    assert unclaimed == []
+
+
+def test_override_yields_to_a_real_join_and_to_a_claimed_brick(tmp_path):
+    """Stale overrides never displace a text join or steal a claimed brick."""
+    og_rows = [_og("5000", "SUNSHINE BAKERY EST 1990", "SUNSHINE"),
+               _og("5002", "ZZQQ XXYY", "NOBODY")]
+    new_rows = [_new("A", "77", "SUNSHINE BAKERY EST 1990", "SUNSHINE")]
+    master, rows, unclaimed = _run_merge(
+        tmp_path, og_rows, new_rows,
+        overrides=[_override("5000", "SUNSHINE", "A", "77"),   # already joined
+                   _override("5002", "NOBODY", "A", "77"),     # brick is taken
+                   _override("5002", "NOBODY", "Q", "1")])     # no such brick
+    assert master["5000"]["status"] == "ok"
+    assert "join_override" not in master["5000"]["flag"]
+    assert master["5002"]["status"] == "unjoined"

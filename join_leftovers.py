@@ -29,11 +29,22 @@ section corroboration, and a tier:
                or a photo read >= 0.70 -- needs a human eye
     none    -- nothing plausible
 
+With --write-overrides PATH the adoptable candidates are also written to
+the join-overrides file merge_lists.py reads (reference/join_overrides.csv):
+clean 'strong' rows, a contested row whose buyer surname is in the workbook
+text (SILVER SPONSOR ATU), and -- for a contested group of IDENTICAL
+inscriptions (7 IBEW sales for one unclaimed copy) -- the lowest number,
+since the sales are indistinguishable and one of them owns the brick.
+Existing lines in the file (incl. hand-added ones) are kept; a candidate
+is added only when neither its OG row nor its workbook row is already in
+the file. Rescue and weak rows are never written: they are for human eyes.
+
 Usage:
     python join_leftovers.py [--master reference/master_list.csv]
         [--xls reference/brick_list_xls.csv]
         [--matched output/pallets_final.csv]
         [--output output/unjoined_join_candidates.csv]
+        [--write-overrides reference/join_overrides.csv]
 """
 from __future__ import annotations
 
@@ -42,9 +53,11 @@ import csv
 from collections import Counter, defaultdict
 from pathlib import Path
 
+from datetime import date
+
 from consensus import _normalise, _similar, scan_fold
-from merge_lists import (RESCUE_MARGIN, RESCUE_MIN_SCORE, _key,
-                         _surname_corroborates)
+from merge_lists import (OVERRIDE_COLUMNS, RESCUE_MARGIN, RESCUE_MIN_SCORE,
+                         _key, _surname_corroborates)
 
 STRONG = 0.80
 WEAK = 0.55
@@ -158,6 +171,61 @@ def _best(keys: list[str], cands: list[dict]) -> tuple[float, float, dict | None
     return best, second, row
 
 
+def _adoptable(results: list[dict]) -> list[dict]:
+    """Strong rows a machine may adopt without a human (see module doc)."""
+    out = []
+    groups = defaultdict(list)
+    for x in results:
+        if x["tier"] == "strong":
+            groups[(x["cand_section"], x["cand_new_id"])].append(x)
+    for group in groups.values():
+        if len(group) == 1 and not group[0]["flags"]:
+            out.append(group[0])
+            continue
+        flags = {f for x in group for f in x["flags"].split(";") if f}
+        if flags - {"contested"}:
+            continue                       # low margin etc.: human only
+        winners = [x for x in group if x["surname_ok"] == "yes"]
+        if len(winners) == 1:
+            out.append(winners[0])
+        elif len({_key(x["og_text"]) for x in group}) == 1:
+            out.append(min(group, key=lambda x: int(x["orig_id"])
+                           if x["orig_id"].isdigit() else 10**9))
+    return out
+
+
+def _write_overrides(results: list[dict], path: Path) -> None:
+    existing = []
+    if path.is_file():
+        with open(path, newline="", encoding="utf-8") as f:
+            existing = list(csv.DictReader(f))
+    taken_og = {(r["orig_id"], r["buyer"]) for r in existing}
+    taken_new = {(r["section"].upper(), r["new_id"]) for r in existing}
+    added = 0
+    for x in _adoptable(results):
+        og, new = (x["orig_id"], x["buyer"]), (x["cand_section"].upper(), x["cand_new_id"])
+        if og in taken_og or new in taken_new:
+            continue
+        taken_og.add(og)
+        taken_new.add(new)
+        existing.append({
+            "orig_id": x["orig_id"], "buyer": x["buyer"],
+            "section": x["cand_section"], "new_id": x["cand_new_id"],
+            "new_inscription": x["cand_inscription"], "score": x["best_score"],
+            "witness": "photo" if float(x["photo_score"]) > float(x["text_score"]) else "text",
+            "source": "join_leftovers strong" + (" (contested, surname)" if "contested" in x["flags"] and x["surname_ok"] == "yes"
+                                                else " (identical copies, lowest #)" if "contested" in x["flags"] else ""),
+            "date": date.today().isoformat(),
+        })
+        added += 1
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with open(path, "w", newline="", encoding="utf-8") as f:
+        w = csv.DictWriter(f, fieldnames=OVERRIDE_COLUMNS)
+        w.writeheader()
+        w.writerows(existing)
+    print(f"overrides: +{added} -> {path} ({len(existing)} lines total)")
+
+
 def main(argv=None) -> None:
     ap = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     ap.add_argument("--master", type=Path, default=Path("reference/master_list.csv"))
@@ -165,6 +233,9 @@ def main(argv=None) -> None:
     ap.add_argument("--matched", type=Path, default=Path("output/pallets_final.csv"))
     ap.add_argument("--output", type=Path,
                     default=Path("output/unjoined_join_candidates.csv"))
+    ap.add_argument("--write-overrides", type=Path, default=None,
+                    help="also append the adoptable joins to this "
+                         "merge_lists override file")
     args = ap.parse_args(argv)
 
     unjoined = _load_unjoined(args.master)
@@ -285,6 +356,8 @@ def main(argv=None) -> None:
 
     tiers = Counter(x["tier"] for x in results)
     print("tiers:", dict(tiers))
+    if args.write_overrides:
+        _write_overrides(results, args.write_overrides)
     print("photo witness decided the candidate:",
           sum(1 for x in results if x["tier"] != "none"
               and float(x["photo_score"]) > float(x["text_score"])))

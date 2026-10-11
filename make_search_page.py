@@ -860,13 +860,6 @@ _INTRO_CLOSED = r"""<div id="closed">
  <a href="https://www.flickr.com/photos/anchorageparksandrec/albums">Flickr
  albums</a> remain online as a photo record of the bricks on each
  pallet.</p>
- <p><b>Missed the pick-up, or have a question about a brick?</b>
- Email
- <a href="mailto:parkvolunteers@anchorageak.gov">parkvolunteers@anchorageak.gov</a>
- or check the Municipality&rsquo;s official
- <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">Commemorative
- Brick Return page</a> for the latest on what happens to the bricks
- that were not claimed.</p>
  <p>Read more about the bricks and the people who came for them:
  <a href="https://www.adn.com/alaska-news/anchorage/2026/08/11/thousands-of-town-square-park-bricks-marked-with-meaning-wait-for-their-owners/">Anchorage
  Daily News, Aug.&nbsp;11</a> &middot;

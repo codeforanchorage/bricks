@@ -89,6 +89,13 @@ _PAGE = r"""<!DOCTYPE html>
  #lastday { background: #8a1c1c; color: #fff; text-align: center;
             font-weight: 700; font-size: 15px; letter-spacing: .3px;
             padding: 8px 14px; }
+ /* --closed build: the deadline banner turns into a calm thank-you. */
+ #lastday.closed { background: #2d5a1b; }
+ #closed { background: #fff; border-radius: 8px; padding: 14px 18px;
+           margin-top: 14px; font-size: 15px; line-height: 1.55;
+           box-shadow: 0 1px 3px rgba(0,0,0,.1); }
+ #closed p { margin: 0 0 10px; }
+ #closed p:last-child { margin-bottom: 0; }
  .chnote { background: #fdf0c2; border-radius: 6px; padding: 6px 10px;
            color: #4a3a00; }
  header h1 { font-size: 20px; margin: 0; }
@@ -184,7 +191,7 @@ _PAGE = r"""<!DOCTYPE html>
 __NAVCSS__</style>
 </head>
 <body>
-<div id="lastday">OCTOBER 10TH IS THE LAST PICK-UP DAY FOR ALL BRICKS</div>
+<div id="lastday"__BANNERCLASS__>__BANNER__</div>
 <header>
  __NAV__
  <h1>__PAGETITLE__</h1>
@@ -192,7 +199,7 @@ __NAVCSS__</style>
 </header>
 <div id="wrap">
 __INTRO__
-<input id="q" placeholder="Type a name, words from the brick, or a brick number&hellip;"__AUTOFOCUS__ autocomplete="off">
+__SEARCHBOX__
 <div id="meta"></div>
 <div id="nextstep" style="display:none">__NEXTSTEP__</div>
 __HELP__
@@ -825,6 +832,54 @@ _NEXTSTEP_PUBLIC = r"""&#9989; <b>Found your brick?</b> Note its
  <b>October&nbsp;10, 2026</b> - details under &ldquo;About this
  search&rdquo; below."""
 
+_BANNER_OPEN = "OCTOBER 10TH IS THE LAST PICK-UP DAY FOR ALL BRICKS"
+_BANNER_CLOSED = "THE BRICK PICK-UP HAS ENDED - THANK YOU, ANCHORAGE!"
+
+_SEARCHBOX = ('<input id="q" placeholder="Type a name, words from the '
+              'brick, or a brick number&hellip;"__AUTOFOCUS__ '
+              'autocomplete="off">')
+# --closed: the script still looks the input up by id, so a hidden one
+# stays in the page; nothing can be typed into it and no data is baked
+# in, so the search is off.
+_SEARCHBOX_CLOSED = '<input id="q" type="hidden">'
+
+# The --closed page: what visitors see once the pick-up is over. The
+# data, the help and the next-step bar are all gone; only this notice,
+# the ADN stories and the credits remain.
+_INTRO_CLOSED = r"""<div id="closed">
+ <p><b>The Town Square Park brick pick-up wrapped up on Saturday,
+ October&nbsp;10, 2026.</b> Thank you to everyone who came out to
+ bring home a piece of Anchorage history, and to the Parks &amp;
+ Recreation staff and volunteers who photographed, sorted and
+ handed out thousands of engraved bricks over the past two
+ months.</p>
+ <p><b>This search tool has been retired.</b> Now that the pick-up is
+ over, the remaining bricks are no longer individually tracked, so
+ the search can no longer tell you where a particular brick is.
+ The Parks &amp; Recreation
+ <a href="https://www.flickr.com/photos/anchorageparksandrec/albums">Flickr
+ albums</a> remain online as a photo record of the bricks on each
+ pallet.</p>
+ <p><b>Missed the pick-up, or have a question about a brick?</b>
+ Email
+ <a href="mailto:parkvolunteers@anchorageak.gov">parkvolunteers@anchorageak.gov</a>
+ or check the Municipality&rsquo;s official
+ <a href="https://www.muni.org/Departments/parks/Pages/TownSquareBricks.aspx">Commemorative
+ Brick Return page</a> for the latest on what happens to the bricks
+ that were not claimed.</p>
+ <p>Read more about the bricks and the people who came for them:
+ <a href="https://www.adn.com/alaska-news/anchorage/2026/08/11/thousands-of-town-square-park-bricks-marked-with-meaning-wait-for-their-owners/">Anchorage
+ Daily News, Aug.&nbsp;11</a> &middot;
+ <a href="https://www.adn.com/alaska-news/anchorage/2026/09/30/over-60-of-town-square-park-bricks-still-await-their-owners-with-final-pick-up-near/">Sept.&nbsp;30
+ update</a>.</p>
+ <p class="buildnote">This page was a volunteer project of
+ <a href="https://codeforanchorage.org/">Code for Anchorage</a>.
+ From August to October 2026 it let brick owners look up more than
+ 13,000 bricks by name or number, and see a photo of the 10,000-plus
+ bricks that were matched to a pallet. The code is open source at
+ <a href="https://github.com/codeforanchorage/bricks">github.com/codeforanchorage/bricks</a>.</p>
+</div>"""
+
 # Google Analytics (public build only -- the staff page sits behind
 # basic auth and its lookups would pollute the visitor stats). The
 # brick search has its own dedicated GA4 property (Town Square
@@ -962,6 +1017,10 @@ def main(argv=None) -> None:
                         help="visitor-facing build: no staff nav, public "
                              "help text, photos only if --photo-base-url "
                              "is given (for GitHub Pages)")
+    parser.add_argument("--closed", action="store_true",
+                        help="pick-up-is-over build of the public page: "
+                             "thank-you notice, no search box, no brick "
+                             "data (implies --public)")
     parser.add_argument("--photo-base-url", default="",
                         help="absolute URL of the hosted photo trees "
                              "(thumbs/zoom/strips), e.g. "
@@ -970,6 +1029,8 @@ def main(argv=None) -> None:
     parser.add_argument("--output", required=True, type=Path,
                         help="Self-contained .html file to write")
     args = parser.parse_args(argv)
+    if args.closed:
+        args.public = True
 
     rows = _load_master(args.master)
     photos, unofficial = _load_photos(args.matched)
@@ -1023,20 +1084,30 @@ def main(argv=None) -> None:
             # load and covers the orient-first intro (iOS ignores it, so
             # desktop testing never showed it). Staff keep it: the
             # counter workflow is type-immediately.
+            .replace("__BANNERCLASS__", ' class="closed"' if args.closed else "")
+            .replace("__BANNER__", _BANNER_CLOSED if args.closed else _BANNER_OPEN)
+            .replace("__SEARCHBOX__",
+                     _SEARCHBOX_CLOSED if args.closed else _SEARCHBOX)
             .replace("__AUTOFOCUS__", "" if args.public else " autofocus")
-            .replace("__INTRO__", _INTRO_PUBLIC if args.public else "")
+            .replace("__INTRO__",
+                     _INTRO_CLOSED if args.closed else
+                     _INTRO_PUBLIC if args.public else "")
             .replace("__NEXTSTEP__",
-                     _NEXTSTEP_PUBLIC if args.public else "")
-            .replace("__HELP__", help_html)
+                     _NEXTSTEP_PUBLIC if args.public and not args.closed
+                     else "")
+            .replace("__HELP__", "" if args.closed else help_html)
             .replace("__CITYHALLHELP__", _CITY_HALL_HELP)
             .replace("__CITYHALL__", _json(CITY_HALL))
             .replace("__SHOWPHOTOS__", "true" if show_photos else "false")
             .replace("__PHOTOBASE__", photo_base)
             .replace("__STRIPV__", STRIP_VERSION)
             .replace("__STAMP__", stamp)
-            .replace("__DATA__", _json(rows))
-            .replace("__PHOTOS__", _json(photos))
-            .replace("__UNOFFICIAL__", _json(unofficial))
+            # --closed bakes no brick data: the search is off and the
+            # page shrinks from ~3 MB to a few KB.
+            .replace("__DATA__", _json([] if args.closed else rows))
+            .replace("__PHOTOS__", _json({} if args.closed else photos))
+            .replace("__UNOFFICIAL__",
+                     _json([] if args.closed else unofficial))
             .replace("__SCAN__", _json(scan_map))
             .replace("__STOP__", _json(sorted(_STOPWORDS))))
 
@@ -1045,7 +1116,10 @@ def main(argv=None) -> None:
     size_mb = args.output.stat().st_size / 1e6
     print(f"Wrote {args.output}  ({len(rows):,} bricks, "
           f"{len(photos):,} with photos, {size_mb:.1f} MB)")
-    if args.public:
+    if args.closed:
+        print("Closed build: pick-up-is-over notice, no search box, no "
+              "brick data (GitHub Pages: commit as docs/index.html).")
+    elif args.public:
         print("Public build: no staff nav; photos "
               + (f"hotlinked from {photo_base}" if show_photos
                  else "OFF (no --photo-base-url)")

@@ -207,3 +207,26 @@ def test_duplicate_photos_of_one_brick_are_counted_not_duplicated(tmp_path):
              "official_section": "K"}])
     photos = _embedded(page, "PHOTOS")
     assert photos["K|5"][2] == 1     # one extra claim recorded, one entry
+
+
+def test_closed_build_turns_the_search_off(tmp_path):
+    """--closed: thank-you notice, hidden input, and NO brick data baked
+    in, so nothing is searchable once the pick-up is over."""
+    master = tmp_path / "master.csv"
+    _write(master, MASTER_COLS, [
+        {"orig_id": "1", "new_id": "1", "section": "A", "moved": "",
+         "status": "confirmed", "buyer": "Smith", "og_inscription": "SMITH",
+         "og_alt": "", "new_inscription": "SMITH", "join_score": "1",
+         "og_verified": "", "flag": ""}])
+    out = tmp_path / "index.html"
+    make_search_page.main(["--master", str(master), "--closed",
+                           "--output", str(out)])
+    page = out.read_text(encoding="utf-8")
+    assert _embedded(page, "DATA") == []
+    assert _embedded(page, "PHOTOS") == {}
+    assert "SMITH" not in page
+    assert '<input id="q" type="hidden">' in page
+    assert "PICK-UP HAS ENDED" in page
+    assert 'id="closed"' in page
+    assert "LAST PICK-UP DAY" not in page
+    assert "<details" not in page          # the pickup help is gone too

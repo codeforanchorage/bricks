@@ -1028,9 +1028,11 @@ def main(argv=None) -> None:
                              "help text, photos only if --photo-base-url "
                              "is given (for GitHub Pages)")
     parser.add_argument("--closed", action="store_true",
-                        help="pick-up-is-over build of the public page: "
-                             "thank-you notice, no search box, no brick "
-                             "data (implies --public)")
+                        help="pick-up-is-over build: thank-you notice with "
+                             "the Parks & Rec closing notice, no search "
+                             "box, no brick data. Works for both builds: "
+                             "add --public for the visitor page, leave it "
+                             "off for the staff page (keeps the nav bar)")
     parser.add_argument("--photo-base-url", default="",
                         help="absolute URL of the hosted photo trees "
                              "(thumbs/zoom/strips), e.g. "
@@ -1039,8 +1041,6 @@ def main(argv=None) -> None:
     parser.add_argument("--output", required=True, type=Path,
                         help="Self-contained .html file to write")
     args = parser.parse_args(argv)
-    if args.closed:
-        args.public = True
 
     rows = _load_master(args.master)
     photos, unofficial = _load_photos(args.matched)
@@ -1064,6 +1064,10 @@ def main(argv=None) -> None:
     # "Built ... 11 unofficial" confusing as a greeting).
     stamp = ("A free volunteer tool from Code for Anchorage"
              if args.public else
+             # Staff closed page: the data is gone, so a brick count
+             # would mislead; say when the search was retired instead.
+             f"Search retired {date.today().isoformat()} · pick-up "
+             "ended October 10, 2026" if args.closed else
              f"Built {date.today().isoformat()} · {len(rows):,} bricks"
              + (f" · {len(photos):,} confirmed at pickup site" if photos
                 else "")
@@ -1098,7 +1102,8 @@ def main(argv=None) -> None:
             .replace("__BANNER__", _BANNER_CLOSED if args.closed else _BANNER_OPEN)
             .replace("__SEARCHBOX__",
                      _SEARCHBOX_CLOSED if args.closed else _SEARCHBOX)
-            .replace("__AUTOFOCUS__", "" if args.public else " autofocus")
+            .replace("__AUTOFOCUS__",
+                     "" if args.public or args.closed else " autofocus")
             .replace("__INTRO__",
                      _INTRO_CLOSED if args.closed else
                      _INTRO_PUBLIC if args.public else "")
@@ -1128,7 +1133,9 @@ def main(argv=None) -> None:
           f"{len(photos):,} with photos, {size_mb:.1f} MB)")
     if args.closed:
         print("Closed build: pick-up-is-over notice, no search box, no "
-              "brick data (GitHub Pages: commit as docs/index.html).")
+              "brick data "
+              + ("(GitHub Pages: commit as docs/index.html)." if args.public
+                 else "(staff page: scp to brendanbabb.com/bricks/search.html)."))
     elif args.public:
         print("Public build: no staff nav; photos "
               + (f"hotlinked from {photo_base}" if show_photos
